@@ -1,0 +1,243 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Relay — Browser ↔ Figma</title>
+  <meta name="description" content="Lightweight browser-to-Figma and Figma-to-HTML bridge." />
+  <style>
+    :root{color-scheme:light;--bg:#f5f5f3;--panel:#fff;--ink:#111;--muted:#6f6f6a;--line:#deded8;--soft:#efefe9;--accent:#111;--danger:#a33}
+    *{box-sizing:border-box}html,body{margin:0;min-height:100%;font-family:Inter,ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;color:var(--ink);background:var(--bg)}
+    body{padding:32px}.shell{max-width:1180px;margin:0 auto}.top{display:flex;align-items:flex-start;justify-content:space-between;gap:24px;margin-bottom:28px}.brand{max-width:760px}.eyebrow{font-size:12px;letter-spacing:.12em;text-transform:uppercase;color:var(--muted);margin-bottom:10px}.brand h1{font-size:clamp(32px,6vw,64px);line-height:.98;letter-spacing:-.055em;margin:0 0 14px}.brand p{font-size:16px;line-height:1.55;color:var(--muted);max-width:720px;margin:0}.badge{border:1px solid var(--line);background:var(--panel);border-radius:999px;padding:9px 12px;font-size:12px;white-space:nowrap}
+    .grid{display:grid;grid-template-columns:minmax(0,1fr) 360px;gap:20px}.card{background:var(--panel);border:1px solid var(--line);border-radius:18px;overflow:hidden}.card-pad{padding:20px}.tabs{display:flex;gap:6px;padding:8px;border-bottom:1px solid var(--line);overflow:auto}.tab{border:0;background:transparent;padding:10px 13px;border-radius:10px;font:inherit;font-size:13px;cursor:pointer;color:var(--muted)}.tab.active{background:var(--soft);color:var(--ink)}
+    .pane{display:none}.pane.active{display:block}.drop{border:1px dashed #bdbdb6;border-radius:14px;padding:34px 24px;text-align:center;background:#fafaf8;cursor:pointer;transition:.15s}.drop.drag{background:#f0f0eb;border-color:#777}.drop strong{display:block;font-size:16px;margin-bottom:7px}.drop span{font-size:13px;color:var(--muted)}input[type=file]{display:none}textarea,input[type=url],input[type=text]{width:100%;border:1px solid var(--line);border-radius:12px;padding:12px 13px;font:inherit;background:#fff;color:var(--ink);outline:none}textarea{min-height:220px;resize:vertical;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:12px;line-height:1.5}input:focus,textarea:focus{border-color:#999}.field{display:grid;gap:7px;margin-bottom:12px}.field label{font-size:12px;color:var(--muted)}
+    .actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:14px}.btn{appearance:none;border:1px solid var(--line);background:#fff;color:var(--ink);border-radius:11px;padding:10px 13px;font:600 13px/1 inherit;cursor:pointer}.btn.primary{background:var(--accent);color:#fff;border-color:var(--accent)}.btn:disabled{opacity:.45;cursor:not-allowed}.btn:hover:not(:disabled){transform:translateY(-1px)}
+    .status{font-size:12px;line-height:1.45;color:var(--muted);margin-top:12px;min-height:18px}.status.error{color:var(--danger)}.preview-wrap{border-top:1px solid var(--line);background:#e9e9e4;min-height:280px;padding:18px;overflow:auto}.preview-empty{height:250px;display:grid;place-items:center;color:var(--muted);font-size:13px}.preview-stage{display:none;transform-origin:top left}.preview-stage.ready{display:block}.preview-frame{border:0;background:#fff;box-shadow:0 2px 14px rgba(0,0,0,.08);display:block}
+    .side h2{font-size:18px;letter-spacing:-.02em;margin:0 0 8px}.side p,.side li{font-size:13px;line-height:1.5;color:var(--muted)}.side ol{padding-left:18px;margin:10px 0 0}.rule{height:1px;background:var(--line);margin:18px 0}.mini{font-size:11px;color:var(--muted);line-height:1.45}.cap{display:flex;justify-content:space-between;gap:12px;padding:9px 0;border-bottom:1px solid var(--line);font-size:12px}.cap:last-child{border-bottom:0}.cap span:last-child{color:var(--muted);text-align:right}.ok{color:#2b6b42!important}.warn{color:#866113!important}
+    .pdf-pages{display:flex;flex-direction:column;gap:18px;align-items:flex-start}.pdf-page{background:#fff;box-shadow:0 2px 14px rgba(0,0,0,.08);line-height:0}.pdf-page img{display:block;max-width:none}
+    code{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:.92em;background:var(--soft);padding:2px 5px;border-radius:5px}
+    @media(max-width:900px){body{padding:18px}.grid{grid-template-columns:1fr}.top{display:block}.badge{display:inline-block;margin-top:16px}}
+  </style>
+</head>
+<body>
+<div class="shell">
+  <header class="top">
+    <div class="brand">
+      <div class="eyebrow">Neustack / utility prototype</div>
+      <h1>Relay.</h1>
+      <p>Move visual work between the browser and Figma without rebuilding it by hand. Browser → Figma uses native Figma clipboard data; Figma → HTML uses the companion local plugin.</p>
+    </div>
+    <div class="badge">local-first · no account</div>
+  </header>
+
+  <main class="grid">
+    <section class="card">
+      <div class="tabs" role="tablist">
+        <button class="tab active" data-pane="html-file">HTML file</button>
+        <button class="tab" data-pane="paste">Paste HTML / SVG</button>
+        <button class="tab" data-pane="url">Website URL</button>
+        <button class="tab" data-pane="pdf">PDF</button>
+      </div>
+
+      <div class="card-pad">
+        <div class="pane active" id="html-file">
+          <label class="drop" for="htmlInput" id="htmlDrop"><strong>Drop a self-contained HTML or SVG file</strong><span>Best results with exported standalone HTML. External absolute assets also work.</span></label>
+          <input id="htmlInput" type="file" accept=".html,.htm,.svg,text/html,image/svg+xml" />
+          <div class="field" style="margin-top:12px"><label for="baseUrl">Base URL for relative assets (optional)</label><input id="baseUrl" type="url" placeholder="https://example.com/path/" /></div>
+        </div>
+
+        <div class="pane" id="paste">
+          <div class="field"><label for="pasteInput">HTML or SVG</label><textarea id="pasteInput" placeholder="Paste markup here…"></textarea></div>
+          <div class="field"><label for="pasteBase">Base URL for relative assets (optional)</label><input id="pasteBase" type="url" placeholder="https://example.com/" /></div>
+          <button class="btn" id="renderPaste">Render pasted markup</button>
+        </div>
+
+        <div class="pane" id="url">
+          <div class="field"><label for="urlInput">Public website URL</label><input id="urlInput" type="url" placeholder="https://example.com" /></div>
+          <div class="actions"><button class="btn" id="loadUrl">Load URL</button><button class="btn" id="copyBookmarklet">Copy dynamic-page bookmarklet</button></div>
+          <div class="mini" style="margin-top:10px">The URL loader fetches HTML and re-renders it locally. For JS-heavy pages, the bookmarklet attempts capture inside the live page so computed styles reflect the current state.</div>
+        </div>
+
+        <div class="pane" id="pdf">
+          <label class="drop" for="pdfInput" id="pdfDrop"><strong>Drop a PDF</strong><span>v0 preserves each page exactly as a raster layer inside a Figma frame.</span></label>
+          <input id="pdfInput" type="file" accept="application/pdf,.pdf" />
+        </div>
+
+        <div class="actions">
+          <button class="btn primary" id="copyFigma" disabled>Copy to Figma</button>
+          <button class="btn" id="clearBtn">Clear</button>
+        </div>
+        <div class="status" id="status">Load something to begin.</div>
+      </div>
+
+      <div class="preview-wrap">
+        <div class="preview-empty" id="previewEmpty">Preview will appear here</div>
+        <div class="preview-stage" id="previewStage"></div>
+      </div>
+    </section>
+
+    <aside class="card side">
+      <div class="card-pad">
+        <h2>What is actually native?</h2>
+        <p>For HTML/SVG, Relay delegates DOM → Figma conversion to <code>@figit/dom-to-figma</code>. It reads computed styles and emits the binary clipboard payload Figma itself accepts.</p>
+        <div class="cap"><span>HTML / SVG</span><span class="ok">editable layers + inferred Auto Layout</span></div>
+        <div class="cap"><span>Public URL</span><span class="ok">same, where the page can be reproduced</span></div>
+        <div class="cap"><span>PDF v0</span><span class="warn">page frame + raster content</span></div>
+        <div class="cap"><span>Figma → HTML</span><span class="ok">companion plugin</span></div>
+        <div class="rule"></div>
+        <h2>Figma → HTML</h2>
+        <ol>
+          <li>Download the companion plugin folder.</li>
+          <li>Figma desktop → Plugins → Development → Import plugin from manifest.</li>
+          <li>Select one or more frames and export one self-contained HTML file.</li>
+        </ol>
+        <div class="actions"><a class="btn" href="./plugin/" target="_blank" rel="noreferrer">Plugin files</a><a class="btn" href="./README.md" target="_blank" rel="noreferrer">Build notes</a></div>
+        <div class="rule"></div>
+        <p class="mini">No promise of magical semantic recovery from PDFs: PDF is a display format, not a layout tree. The next step is text/vector reconstruction plus geometry-based Auto Layout inference.</p>
+      </div>
+    </aside>
+  </main>
+</div>
+
+<script type="module">
+  const $ = (s) => document.querySelector(s);
+  const status = $('#status');
+  const stage = $('#previewStage');
+  const empty = $('#previewEmpty');
+  const copyBtn = $('#copyFigma');
+  let mode = null;
+  let frameSpecs = [];
+  let figmaConverter = null;
+
+  function setStatus(message, error=false){ status.textContent = message; status.className = 'status' + (error ? ' error' : ''); }
+  function reset(){ mode=null; frameSpecs=[]; stage.innerHTML=''; stage.classList.remove('ready'); empty.style.display='grid'; copyBtn.disabled=true; setStatus('Load something to begin.'); }
+
+  document.querySelectorAll('.tab').forEach(tab => tab.addEventListener('click', () => {
+    document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));
+    document.querySelectorAll('.pane').forEach(p=>p.classList.remove('active'));
+    tab.classList.add('active'); $('#' + tab.dataset.pane).classList.add('active');
+  }));
+  $('#clearBtn').addEventListener('click', reset);
+
+  async function getConverter(){
+    if(figmaConverter) return figmaConverter;
+    setStatus('Loading the Figma conversion engine…');
+    const mod = await import('https://esm.sh/@figit/dom-to-figma@0.2.4?bundle');
+    const imageLoader = async ({src}) => {
+      const direct = async () => {
+        const r = await fetch(src, {mode:'cors'}); if(!r.ok) throw new Error('direct image fetch failed');
+        const b = await r.blob(); return {bytes: await b.arrayBuffer(), mimeType: b.type || 'image/png'};
+      };
+      try { return await direct(); }
+      catch {
+        const r = await fetch('/api/proxy?mode=asset&url=' + encodeURIComponent(src));
+        if(!r.ok) throw new Error('asset proxy failed');
+        const b = await r.blob(); return {bytes: await b.arrayBuffer(), mimeType: b.type || 'image/png'};
+      }
+    };
+    figmaConverter = mod.createFigmaConverter({layout:'auto', imageLoader});
+    return figmaConverter;
+  }
+
+  function injectBase(markup, baseUrl){
+    if(!baseUrl) return markup;
+    const tag = `<base href="${baseUrl.replace(/"/g,'&quot;')}">`;
+    if(/<head[\s>]/i.test(markup)) return markup.replace(/<head([^>]*)>/i, `<head$1>${tag}`);
+    return `<!doctype html><html><head>${tag}</head><body>${markup}</body></html>`;
+  }
+
+  async function waitForFrame(frame){
+    await new Promise((resolve,reject)=>{const timer=setTimeout(()=>reject(new Error('Render timed out')),12000);frame.onload=()=>{clearTimeout(timer);resolve()};frame.onerror=()=>{clearTimeout(timer);reject(new Error('Render failed'))};});
+    const doc = frame.contentDocument;
+    if(doc?.fonts?.ready) await Promise.race([doc.fonts.ready, new Promise(r=>setTimeout(r,2500))]);
+    const imgs = [...(doc?.images||[])];
+    await Promise.all(imgs.map(img => img.complete ? null : new Promise(r=>{img.onload=img.onerror=r;setTimeout(r,3500)})));
+    await new Promise(r=>requestAnimationFrame(()=>requestAnimationFrame(r)));
+  }
+
+  async function renderMarkup(markup, baseUrl='', label='Imported design'){
+    reset(); setStatus('Rendering in an isolated browser frame…');
+    const frame = document.createElement('iframe');
+    frame.className='preview-frame'; frame.setAttribute('sandbox','allow-same-origin');
+    frame.style.width='1440px'; frame.style.height='900px';
+    stage.appendChild(frame); frame.srcdoc = injectBase(markup, baseUrl);
+    try{
+      await waitForFrame(frame);
+      const doc=frame.contentDocument; const root=doc.body;
+      const width=Math.ceil(Math.max(doc.documentElement.scrollWidth, root.scrollWidth, 1));
+      const height=Math.ceil(Math.max(doc.documentElement.scrollHeight, root.scrollHeight, 1));
+      frame.style.width=width+'px'; frame.style.height=height+'px';
+      mode='dom'; frameSpecs=[{element:root,width,height,name:label}];
+      empty.style.display='none'; stage.classList.add('ready'); copyBtn.disabled=false;
+      setStatus(`Ready: ${width} × ${height}px. Copy, switch to Figma, paste.`);
+    }catch(err){ setStatus(err.message || String(err), true); }
+  }
+
+  async function readMarkupFile(file, baseUrl=''){
+    if(!file) return; const text=await file.text();
+    const isSvg=file.type.includes('svg') || /\.svg$/i.test(file.name);
+    const markup=isSvg ? `<!doctype html><html><body style="margin:0;display:inline-block">${text}</body></html>` : text;
+    await renderMarkup(markup, baseUrl, file.name.replace(/\.[^.]+$/,''));
+  }
+
+  $('#htmlInput').addEventListener('change', e=>readMarkupFile(e.target.files[0], $('#baseUrl').value.trim()));
+  $('#renderPaste').addEventListener('click',()=>{const text=$('#pasteInput').value.trim(); if(!text) return setStatus('Paste HTML or SVG first.',true); renderMarkup(text,$('#pasteBase').value.trim(),'Pasted design')});
+  $('#loadUrl').addEventListener('click', async()=>{
+    const url=$('#urlInput').value.trim(); if(!url) return setStatus('Enter a URL first.',true);
+    setStatus('Fetching page HTML…');
+    try{
+      const r=await fetch('/api/proxy?mode=html&url='+encodeURIComponent(url)); const data=await r.json();
+      if(!r.ok) throw new Error(data.error||'Could not fetch page');
+      await renderMarkup(data.html,data.finalUrl||url,new URL(data.finalUrl||url).hostname);
+    }catch(err){setStatus(err.message||String(err),true)}
+  });
+
+  const bookmarklet = `javascript:(async()=>{try{const m=await import('https://esm.sh/@figit/dom-to-figma@0.2.4?bundle');const c=m.createFigmaConverter({layout:'auto'});const r=await c.convert({element:document.body,width:Math.max(document.documentElement.scrollWidth,innerWidth),height:Math.max(document.documentElement.scrollHeight,innerHeight),name:document.title||location.hostname});await navigator.clipboard.write([r.toClipboardItem()]);alert('Copied to Figma clipboard — paste in Figma.')}catch(e){alert('Relay capture failed: '+e.message)}})();`;
+  $('#copyBookmarklet').addEventListener('click',async()=>{try{await navigator.clipboard.writeText(bookmarklet);setStatus('Bookmarklet copied. Create a browser bookmark and paste it into the bookmark URL field.')}catch{setStatus('Clipboard blocked. Copy from DevTools: '+bookmarklet,true)}});
+
+  async function renderPdf(file){
+    if(!file) return; reset(); setStatus('Loading PDF renderer…');
+    try{
+      const pdfjs = await import('https://cdn.jsdelivr.net/npm/pdfjs-dist@4.10.38/build/pdf.min.mjs');
+      pdfjs.GlobalWorkerOptions.workerSrc='https://cdn.jsdelivr.net/npm/pdfjs-dist@4.10.38/build/pdf.worker.min.mjs';
+      const data=new Uint8Array(await file.arrayBuffer()); const pdf=await pdfjs.getDocument({data}).promise;
+      const holder=document.createElement('div'); holder.className='pdf-pages'; stage.appendChild(holder);
+      const specs=[];
+      for(let i=1;i<=pdf.numPages;i++){
+        setStatus(`Rendering PDF page ${i} of ${pdf.numPages}…`);
+        const page=await pdf.getPage(i); const cssViewport=page.getViewport({scale:96/72}); const renderViewport=page.getViewport({scale:(96/72)*2});
+        const canvas=document.createElement('canvas'); canvas.width=Math.ceil(renderViewport.width); canvas.height=Math.ceil(renderViewport.height);
+        await page.render({canvasContext:canvas.getContext('2d',{alpha:false}),viewport:renderViewport}).promise;
+        const wrap=document.createElement('div'); wrap.className='pdf-page'; wrap.style.width=cssViewport.width+'px'; wrap.style.height=cssViewport.height+'px';
+        const img=document.createElement('img'); img.src=canvas.toDataURL('image/png'); img.width=Math.ceil(cssViewport.width); img.height=Math.ceil(cssViewport.height); img.style.width=cssViewport.width+'px'; img.style.height=cssViewport.height+'px'; wrap.appendChild(img); holder.appendChild(wrap);
+        specs.push({element:wrap,width:Math.ceil(cssViewport.width),height:Math.ceil(cssViewport.height),x:(i-1)*(Math.ceil(cssViewport.width)+80),y:0,name:`${file.name} — page ${i}`});
+      }
+      mode='pdf'; frameSpecs=specs; empty.style.display='none'; stage.classList.add('ready'); copyBtn.disabled=false;
+      setStatus(`Ready: ${pdf.numPages} PDF page${pdf.numPages===1?'':'s'}. v0 keeps page contents raster-exact.`);
+    }catch(err){setStatus(err.message||String(err),true)}
+  }
+  $('#pdfInput').addEventListener('change',e=>renderPdf(e.target.files[0]));
+
+  function setupDrop(drop, input){
+    ['dragenter','dragover'].forEach(ev=>drop.addEventListener(ev,e=>{e.preventDefault();drop.classList.add('drag')}));
+    ['dragleave','drop'].forEach(ev=>drop.addEventListener(ev,e=>{e.preventDefault();drop.classList.remove('drag')}));
+    drop.addEventListener('drop',e=>{const f=e.dataTransfer.files?.[0];if(f){const dt=new DataTransfer();dt.items.add(f);input.files=dt.files;input.dispatchEvent(new Event('change'))}});
+  }
+  setupDrop($('#htmlDrop'),$('#htmlInput')); setupDrop($('#pdfDrop'),$('#pdfInput'));
+
+  copyBtn.addEventListener('click', async()=>{
+    if(!frameSpecs.length) return;
+    try{
+      copyBtn.disabled=true; setStatus('Encoding native Figma clipboard data…'); const c=await getConverter();
+      let result;
+      if(frameSpecs.length===1 && mode==='dom') result=await c.convert(frameSpecs[0]);
+      else result=await c.convert({frames:frameSpecs,canvasName:mode==='pdf'?'PDF import':'Relay import'});
+      await navigator.clipboard.write([result.toClipboardItem()]);
+      setStatus('Copied. Paste directly into a Figma canvas with ⌘V / Ctrl+V.');
+    }catch(err){
+      console.error(err); setStatus('Conversion failed: '+(err.message||String(err)),true);
+    }finally{copyBtn.disabled=false}
+  });
+</script>
+</body>
+</html>
