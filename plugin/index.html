@@ -1,0 +1,9 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"/><meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>Figma Bridge — Export HTML plugin</title>
+<style>*{box-sizing:border-box}body{font-family:Inter,system-ui,sans-serif;margin:0;background:#f5f5f3;color:#111;padding:32px}.wrap{max-width:720px;margin:auto;background:#fff;border:1px solid #deded8;border-radius:18px;padding:28px}h1{font-size:36px;letter-spacing:-.04em;margin:0 0 10px}p,li{color:#686864;line-height:1.55}a{color:#111}.files{display:grid;gap:8px;margin:18px 0}.file{display:flex;justify-content:space-between;border:1px solid #deded8;border-radius:10px;padding:11px 12px;text-decoration:none}.file span:last-child{color:#777}.note{font-size:12px;border-top:1px solid #deded8;padding-top:16px;margin-top:20px}</style>
+</head>
+<body><main class="wrap"><h1>Figma Bridge → HTML</h1><p>This is a local Figma development plugin. Put the three files below in one folder, then import <strong>manifest.json</strong> from Figma Desktop.</p><div class="files"><a class="file" href="./manifest.json" download><span>manifest.json</span><span>download</span></a><a class="file" href="./code.js" download><span>code.js</span><span>download</span></a><a class="file" href="./ui.html" download><span>ui.html</span><span>download</span></a></div><ol><li>Create a folder named <code>figma-bridge-export-html</code>.</li><li>Save all three files into it.</li><li>Figma Desktop → Plugins → Development → Import plugin from manifest…</li><li>Select a frame, run <strong>Figma Bridge — Export HTML</strong>, then export.</li></ol><p class="note">The export is a single HTML file: Auto Layout becomes flex, vectors become inline SVG, image fills are embedded, and unsupported complex layers rasterize only as a fallback.</p><p><a href="../">← Back to Figma Bridge</a></p></main></body>
+</html>

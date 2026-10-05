@@ -34,7 +34,7 @@ async function fetchWithSafeRedirects(initialUrl) {
     const response = await fetch(url, {
       redirect: 'manual',
       headers: {
-        'user-agent': 'Mozilla/5.0 (compatible; Relay/0.1; +https://neustackstudio.com)',
+        'user-agent': 'Mozilla/5.0 (compatible; FigmaBridge/0.1; +https://neustackstudio.com)',
         accept: 'text/html,application/xhtml+xml,image/avif,image/webp,image/apng,image/svg+xml,image/*,*/*;q=0.8',
       },
     });

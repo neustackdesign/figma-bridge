@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>Relay — Browser ↔ Figma</title>
+  <title>Figma Bridge — Browser ↔ Figma</title>
   <meta name="description" content="Lightweight browser-to-Figma and Figma-to-HTML bridge." />
   <style>
     :root{color-scheme:light;--bg:#f5f5f3;--panel:#fff;--ink:#111;--muted:#6f6f6a;--line:#deded8;--soft:#efefe9;--accent:#111;--danger:#a33}
@@ -24,7 +24,7 @@
   <header class="top">
     <div class="brand">
       <div class="eyebrow">Neustack / utility prototype</div>
-      <h1>Relay.</h1>
+      <h1>Figma Bridge.</h1>
       <p>Move visual work between the browser and Figma without rebuilding it by hand. Browser → Figma uses native Figma clipboard data; Figma → HTML uses the companion local plugin.</p>
     </div>
     <div class="badge">local-first · no account</div>
@@ -79,7 +79,7 @@
     <aside class="card side">
       <div class="card-pad">
         <h2>What is actually native?</h2>
-        <p>For HTML/SVG, Relay delegates DOM → Figma conversion to <code>@figit/dom-to-figma</code>. It reads computed styles and emits the binary clipboard payload Figma itself accepts.</p>
+        <p>For HTML/SVG, Figma Bridge delegates DOM → Figma conversion to <code>@figit/dom-to-figma</code>. It reads computed styles and emits the binary clipboard payload Figma itself accepts.</p>
         <div class="cap"><span>HTML / SVG</span><span class="ok">editable layers + inferred Auto Layout</span></div>
         <div class="cap"><span>Public URL</span><span class="ok">same, where the page can be reproduced</span></div>
         <div class="cap"><span>PDF v0</span><span class="warn">page frame + raster content</span></div>
@@ -192,7 +192,7 @@
     }catch(err){setStatus(err.message||String(err),true)}
   });
 
-  const bookmarklet = `javascript:(async()=>{try{const m=await import('https://esm.sh/@figit/dom-to-figma@0.2.4?bundle');const c=m.createFigmaConverter({layout:'auto'});const r=await c.convert({element:document.body,width:Math.max(document.documentElement.scrollWidth,innerWidth),height:Math.max(document.documentElement.scrollHeight,innerHeight),name:document.title||location.hostname});await navigator.clipboard.write([r.toClipboardItem()]);alert('Copied to Figma clipboard — paste in Figma.')}catch(e){alert('Relay capture failed: '+e.message)}})();`;
+  const bookmarklet = `javascript:(async()=>{try{const m=await import('https://esm.sh/@figit/dom-to-figma@0.2.4?bundle');const c=m.createFigmaConverter({layout:'auto'});const r=await c.convert({element:document.body,width:Math.max(document.documentElement.scrollWidth,innerWidth),height:Math.max(document.documentElement.scrollHeight,innerHeight),name:document.title||location.hostname});await navigator.clipboard.write([r.toClipboardItem()]);alert('Copied to Figma clipboard — paste in Figma.')}catch(e){alert('Figma Bridge capture failed: '+e.message)}})();`;
   $('#copyBookmarklet').addEventListener('click',async()=>{try{await navigator.clipboard.writeText(bookmarklet);setStatus('Bookmarklet copied. Create a browser bookmark and paste it into the bookmark URL field.')}catch{setStatus('Clipboard blocked. Copy from DevTools: '+bookmarklet,true)}});
 
   async function renderPdf(file){
@@ -231,7 +231,7 @@
       copyBtn.disabled=true; setStatus('Encoding native Figma clipboard data…'); const c=await getConverter();
       let result;
       if(frameSpecs.length===1 && mode==='dom') result=await c.convert(frameSpecs[0]);
-      else result=await c.convert({frames:frameSpecs,canvasName:mode==='pdf'?'PDF import':'Relay import'});
+      else result=await c.convert({frames:frameSpecs,canvasName:mode==='pdf'?'PDF import':'Figma Bridge import'});
       await navigator.clipboard.write([result.toClipboardItem()]);
       setStatus('Copied. Paste directly into a Figma canvas with ⌘V / Ctrl+V.');
     }catch(err){
