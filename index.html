@@ -248,7 +248,7 @@ async function renderPdf(file){
     const specs=[];
     let vectorPages=0,fallbackPages=0,vectorNodes=0,textNodes=0,imageNodes=0;
     for(let i=1;i<=pdf.numPages;i++){
-      setStatus(\`Reconstructing PDF page \${i} of \${pdf.numPages}…\`);
+      setStatus(`Reconstructing PDF page ${i} of ${pdf.numPages}…`);
       const page=await pdf.getPage(i);
       const viewport=page.getViewport({scale:96/72});
       const width=Math.ceil(viewport.width),height=Math.ceil(viewport.height);
@@ -284,13 +284,13 @@ async function renderPdf(file){
         await rasterPdfPage(page,viewport,wrap);
         fallbackPages++
       }
-      specs.push({element:wrap,width,height,x:(i-1)*(width+80),y:0,name:\`\${file.name} — page \${i}\`});
+      specs.push({element:wrap,width,height,x:(i-1)*(width+80),y:0,name:`${file.name} — page ${i}`});
       page.cleanup?.()
     }
     mode='pdf';frameSpecs=specs;empty.style.display='none';stage.classList.add('ready');copyBtn.disabled=false;
-    const reconstructedLabel=vectorPages?\`\${vectorPages} reconstructed page\${vectorPages===1?'':'s'} · \${vectorNodes} vector shape\${vectorNodes===1?'':'s'} · \${textNodes} text node\${textNodes===1?'':'s'} · \${imageNodes} image\${imageNodes===1?'':'s'}\`:'';
-    const fallbackLabel=fallbackPages?\` · \${fallbackPages} raster fallback page\${fallbackPages===1?'':'s'}\`:'';
-    setStatus(\`Ready: \${pdf.numPages} PDF page\${pdf.numPages===1?'':'s'}. \${reconstructedLabel}\${fallbackLabel}\`,false,true)
+    const reconstructedLabel=vectorPages?`${vectorPages} reconstructed page${vectorPages===1?'':'s'} · ${vectorNodes} vector shape${vectorNodes===1?'':'s'} · ${textNodes} text node${textNodes===1?'':'s'} · ${imageNodes} image${imageNodes===1?'':'s'}`:'';
+    const fallbackLabel=fallbackPages?` · ${fallbackPages} raster fallback page${fallbackPages===1?'':'s'}`:'';
+    setStatus(`Ready: ${pdf.numPages} PDF page${pdf.numPages===1?'':'s'}. ${reconstructedLabel}${fallbackLabel}`,false,true)
   }catch(err){setStatus(err.message||String(err),true)}
 }
 $('#pdfInput').addEventListener('change',e=>renderPdf(e.target.files[0]));
