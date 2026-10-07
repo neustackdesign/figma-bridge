@@ -24,7 +24,7 @@
 .progressTrack{height:2px;flex:none;background:var(--white)}.progressTrack::after{content:"";display:block;height:2px;width:100%;background:linear-gradient(90deg,var(--accent) 0 7%,transparent 7%)}
 .studio{flex:none;display:grid;grid-template-columns:310px minmax(0,1fr) 330px;grid-template-rows:minmax(0,1fr);height:calc(100vh - var(--header-h) - 2px);height:calc(100dvh - var(--header-h) - 2px);min-height:0}.rail,.inspector{position:relative;background:var(--white);overflow:auto;min-height:0}.rail{border-right:1px solid var(--border);padding:18px}.inspector{border-left:1px solid var(--border)}.section{display:flex;flex-direction:column;gap:10px}.section+.section{margin-top:24px;padding-top:22px;border-top:1px solid var(--hairline)}.sectionHead{display:flex;align-items:center;justify-content:space-between;gap:10px}.eyebrow{font-size:11.5px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}.serifHead{margin:0;font-family:var(--serif);font-weight:400;font-size:24px;line-height:1.08}.micro{font-size:12px;line-height:1.45;color:var(--muted)}
 .tabs{display:grid;grid-template-columns:1fr 1fr;gap:5px}.tab{height:35px;border-radius:8px;border:1px solid transparent;background:transparent;color:var(--muted);font-size:13px;font-weight:600;padding:0 9px;text-align:center}.tab:hover{background:#f6f4f0;color:var(--ink)}.tab.active{background:#f2f0ec;color:var(--ink);border-color:var(--border)}.pane{display:none;margin-top:15px}.pane.active{display:block}.drop{display:flex;align-items:center;gap:12px;border:1px dashed #bdb8ae;border-radius:12px;padding:14px;background:#faf9f6;cursor:pointer;text-align:left;transition:.15s}.drop:hover,.drop.drag{background:#f4f2ee;border-color:#9f9a90}.fileMark{width:40px;height:48px;flex:none;display:grid;place-items:center;border:1px solid var(--border-strong);border-radius:6px;background:var(--white);font-family:var(--mono);font-size:9px;font-weight:700;color:var(--muted)}.dropCopy{min-width:0}.drop strong{display:block;font-size:13.5px;line-height:1.25;margin-bottom:3px}.drop span{font-size:12px;line-height:1.35;color:var(--muted)}input[type=file]{display:none}.field{display:grid;gap:6px;margin-top:12px}.field label{font-size:11.5px;font-weight:600;color:var(--muted)}textarea,input[type=url],input[type=text]{width:100%;border:1px solid var(--border-strong);border-radius:8px;padding:9px 10px;background:var(--white);outline:none;font-size:13px}textarea{min-height:160px;resize:vertical;font-family:var(--mono);font-size:11.5px;line-height:1.5}textarea:focus,input:focus{border-color:#b7b1a7}.railActions{display:flex;gap:7px;flex-wrap:wrap;margin-top:10px}.railActions .btn{height:32px;font-size:13px;padding:0 11px}.notice{margin-top:12px;padding:10px 11px;border-radius:9px;background:var(--accent-wash);border:1px solid #f1d5cb;font-size:11.5px;line-height:1.45;color:#6d3a2a}.notice strong{color:var(--accent-ink)}
-.canvasArea{position:relative;min-height:0;min-width:0;display:flex;flex-direction:column}.canvasToolbar{height:47px;flex:none;display:flex;align-items:center;justify-content:space-between;gap:12px;padding:0 14px 0 16px;background:rgba(255,255,255,.94);border-bottom:1px solid var(--border)}.canvasLabel{display:flex;align-items:baseline;gap:9px;min-width:0}.canvasTitle{font-family:var(--serif);font-size:23px;line-height:1}.canvasSub{font-size:12.5px;color:var(--muted);white-space:nowrap}.toolbarMeta{display:flex;align-items:center;gap:6px}.chip{height:26px;padding:0 8px;border-radius:6px;background:#e9e7e1;color:var(--ink-2);display:inline-flex;align-items:center;font-size:11px;font-weight:700;letter-spacing:.02em}.chipAccent{background:#fbe4da;color:#a5340f}.preview-wrap{position:relative;flex:1;min-height:0;min-width:0;overflow:auto;padding:28px;background-color:var(--canvas);background-image:radial-gradient(var(--dot) 1px,transparent 1px);background-size:22px 22px;background-attachment:local}.preview-empty{min-height:100%;display:grid;place-items:center;padding:36px}.emptyInner{max-width:430px;text-align:center}.emptyGlyph{width:56px;height:56px;margin:0 auto 16px;border:1px solid var(--border-strong);border-radius:14px;background:rgba(255,255,255,.76);display:grid;place-items:center;font-family:var(--serif);font-size:26px;color:var(--accent);box-shadow:0 8px 28px rgba(56,48,38,.06)}.emptyTitle{margin:0 0 7px;font-family:var(--serif);font-size:34px;font-weight:400;line-height:1.02}.emptyText{margin:0;color:var(--muted);font-size:13.5px;line-height:1.5}.preview-stage{display:none;position:relative;transform-origin:top left;margin:0 auto}.preview-stage.ready{display:block}.preview-frame{position:absolute;left:0;top:0;border:1px solid #cfcac1;background:#fff;box-shadow:0 10px 35px rgba(49,42,33,.16);display:block;width:1440px;height:900px;transform-origin:top left}.pdf-pages{display:flex;flex-direction:column;gap:18px;align-items:flex-start}.pdf-page{background:#fff;border:1px solid var(--border-strong);box-shadow:0 10px 35px rgba(49,42,33,.12);line-height:0}.pdf-page img{display:block;max-width:none}
+.canvasArea{position:relative;min-height:0;min-width:0;display:flex;flex-direction:column}.canvasToolbar{height:47px;flex:none;display:flex;align-items:center;justify-content:space-between;gap:12px;padding:0 14px 0 16px;background:rgba(255,255,255,.94);border-bottom:1px solid var(--border)}.canvasLabel{display:flex;align-items:baseline;gap:9px;min-width:0}.canvasTitle{font-family:var(--serif);font-size:23px;line-height:1}.canvasSub{font-size:12.5px;color:var(--muted);white-space:nowrap}.toolbarMeta{display:flex;align-items:center;gap:6px}.chip{height:26px;padding:0 8px;border-radius:6px;background:#e9e7e1;color:var(--ink-2);display:inline-flex;align-items:center;font-size:11px;font-weight:700;letter-spacing:.02em}.chipAccent{background:#fbe4da;color:#a5340f}.preview-wrap{position:relative;flex:1;min-height:0;min-width:0;overflow:auto;padding:28px;background-color:var(--canvas);background-image:radial-gradient(var(--dot) 1px,transparent 1px);background-size:22px 22px;background-attachment:local}.preview-empty{min-height:100%;display:grid;place-items:center;padding:36px}.emptyInner{max-width:430px;text-align:center}.emptyGlyph{width:56px;height:56px;margin:0 auto 16px;border:1px solid var(--border-strong);border-radius:14px;background:rgba(255,255,255,.76);display:grid;place-items:center;font-family:var(--serif);font-size:26px;color:var(--accent);box-shadow:0 8px 28px rgba(56,48,38,.06)}.emptyTitle{margin:0 0 7px;font-family:var(--serif);font-size:34px;font-weight:400;line-height:1.02}.emptyText{margin:0;color:var(--muted);font-size:13.5px;line-height:1.5}.preview-stage{display:none;position:relative;transform-origin:top left;margin:0 auto}.preview-stage.ready{display:block}.preview-frame{position:absolute;left:0;top:0;border:1px solid #cfcac1;background:#fff;box-shadow:0 10px 35px rgba(49,42,33,.16);display:block;width:1440px;height:900px;transform-origin:top left}.pdf-pages{display:flex;flex-direction:column;gap:18px;align-items:flex-start}.pdf-page{position:relative;overflow:hidden;background:#fff;border:1px solid var(--border-strong);box-shadow:0 10px 35px rgba(49,42,33,.12);line-height:0}.pdf-page>svg{position:absolute;inset:0;display:block;overflow:visible}.pdf-page img{display:block;max-width:none}
 .inspectorInner{padding:18px}.inspectCard{border:1px solid var(--border);border-radius:12px;padding:12px 13px;background:var(--white)}.inspectCard.accent{background:var(--accent-wash);border-color:#f0d8cf}.cap{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:9px 0;border-bottom:1px solid var(--hairline);font-size:12.5px}.cap:last-child{border-bottom:0;padding-bottom:0}.cap:first-child{padding-top:0}.cap span:last-child{text-align:right;color:var(--muted)}.cap .ok{color:var(--success)}.cap .warn{color:var(--warning)}.direction{display:flex;align-items:center;gap:10px}.directionMark{width:34px;height:34px;border-radius:9px;background:var(--ink);color:var(--white);display:grid;place-items:center;font-family:var(--serif);font-size:20px;flex:none}.directionCopy{min-width:0}.directionTitle{font-size:13.5px;font-weight:700}.directionMeta{font-size:12px;color:var(--muted);margin-top:1px}.installSteps{margin:10px 0 0;padding-left:18px;color:var(--muted);font-size:12.5px;line-height:1.55}.inspectorActions{display:flex;gap:7px;flex-wrap:wrap;margin-top:12px}.inspectorActions .btn{height:32px;font-size:13px;padding:0 11px}.family{display:flex;flex-wrap:wrap;gap:6px}.family a{height:28px;padding:0 9px;border-radius:7px;background:#f4f2ee;color:var(--ink-2);text-decoration:none;display:inline-flex;align-items:center;font-size:11.5px;font-weight:600}.family a:hover{background:#e9e7e1;color:var(--ink)}code{font-family:var(--mono);font-size:.92em;background:#f2f0ec;padding:2px 5px;border-radius:4px}
 @media(max-width:1180px){.studio{grid-template-columns:270px minmax(0,1fr) 300px}.tagline{display:none}.canvasSub{display:none}}
 @media(max-width:999px){body{overflow:auto}.appHeader{position:sticky;top:0}.status{display:none}.studio{height:auto;display:flex;flex-direction:column}.rail,.inspector{overflow:visible;border:0}.rail{border-bottom:1px solid var(--border)}.canvasArea{min-height:650px;border-bottom:1px solid var(--border)}.preview-wrap{min-height:600px}.inspector{border-top:0}.tagline{display:block}.canvasSub{display:inline}.toolbarMeta{display:none}}
@@ -81,7 +81,7 @@
         <div class="pane" id="pdf">
           <label class="drop" for="pdfInput" id="pdfDrop">
             <span class="fileMark">PDF</span>
-            <span class="dropCopy"><strong>Drop a PDF</strong><span>v0 keeps every page visually exact as raster content inside a Figma frame.</span></span>
+            <span class="dropCopy"><strong>Drop a PDF</strong><span>Reconstructs vectors, editable text and embedded images. Raster is used only when a page cannot be reconstructed safely.</span></span>
           </label>
           <input id="pdfInput" type="file" accept="application/pdf,.pdf" />
         </div>
@@ -119,7 +119,7 @@
             <div class="cap"><span>HTML / SVG</span><span class="ok">editable + Auto Layout</span></div>
             <div class="cap"><span>Scripted HTML</span><span class="ok">render → reveal → freeze</span></div>
             <div class="cap"><span>Public URL</span><span class="ok">server HTML / live capture</span></div>
-            <div class="cap"><span>PDF v0</span><span class="warn">frame + raster page</span></div>
+            <div class="cap"><span>PDF v1</span><span class="ok">vectors + editable text</span></div>
           </div>
           <p class="micro">DOM → Figma is handled by <code>@figit/dom-to-figma</code>. Containers become native Auto Layout only when the measured browser geometry can be reproduced exactly.</p>
         </section>
@@ -169,7 +169,130 @@ $('#renderPaste').addEventListener('click',()=>{const text=$('#pasteInput').valu
 $('#loadUrl').addEventListener('click',async()=>{const url=$('#urlInput').value.trim();if(!url)return setStatus('Enter a URL first.',true);setStatus('Fetching page HTML…');try{const r=await fetch('/api/proxy?mode=html&url='+encodeURIComponent(url)),data=await r.json();if(!r.ok)throw new Error(data.error||'Could not fetch page');await renderStaticMarkup(data.html,data.finalUrl||url,new URL(data.finalUrl||url).hostname,'url')}catch(err){setStatus(err.message||String(err),true)}});
 const bookmarklet=`javascript:(async()=>{try{const sleep=ms=>new Promise(r=>setTimeout(r,ms));const max=Math.max(0,document.documentElement.scrollHeight-innerHeight),step=Math.max(320,Math.floor(innerHeight*.72));for(let y=0;y<=max;y+=step){scrollTo(0,y);await sleep(50)}scrollTo(0,0);document.querySelectorAll('[data-reveal]').forEach(el=>{el.style.opacity='1';el.style.transform='none';el.style.visibility='visible'});const st=document.createElement('style');st.textContent='*,*::before,*::after{transition:none!important;animation-play-state:paused!important}';document.head.appendChild(st);await sleep(100);const m=await import('https://esm.sh/@figit/dom-to-figma@0.2.4?bundle');const c=m.createFigmaConverter({layout:'auto'});const r=await c.convert({element:document.body,width:Math.max(document.documentElement.scrollWidth,innerWidth),height:Math.max(document.documentElement.scrollHeight,innerHeight),name:document.title||location.hostname});await navigator.clipboard.write([r.toClipboardItem()]);alert('Copied to Figma clipboard — paste in Figma.')}catch(e){alert('Figma Bridge capture failed: '+e.message)}})();`;
 $('#copyBookmarklet').addEventListener('click',async()=>{try{await navigator.clipboard.writeText(bookmarklet);setStatus('Bookmarklet copied. Create a browser bookmark and paste it into the bookmark URL field.')}catch{setStatus('Clipboard blocked. Copy the bookmarklet from DevTools.',true)}});
-async function renderPdf(file){if(!file)return;reset();setStatus('Loading PDF renderer…');try{const pdfjs=await import('https://cdn.jsdelivr.net/npm/pdfjs-dist@4.10.38/build/pdf.min.mjs');pdfjs.GlobalWorkerOptions.workerSrc='https://cdn.jsdelivr.net/npm/pdfjs-dist@4.10.38/build/pdf.worker.min.mjs';const data=new Uint8Array(await file.arrayBuffer()),pdf=await pdfjs.getDocument({data}).promise;stage.style.width='auto';stage.style.height='auto';const holder=document.createElement('div');holder.className='pdf-pages';stage.appendChild(holder);const specs=[];for(let i=1;i<=pdf.numPages;i++){setStatus(`Rendering PDF page ${i} of ${pdf.numPages}…`);const page=await pdf.getPage(i),cssViewport=page.getViewport({scale:96/72}),renderViewport=page.getViewport({scale:(96/72)*2}),canvas=document.createElement('canvas');canvas.width=Math.ceil(renderViewport.width);canvas.height=Math.ceil(renderViewport.height);await page.render({canvasContext:canvas.getContext('2d',{alpha:false}),viewport:renderViewport}).promise;const wrap=document.createElement('div');wrap.className='pdf-page';wrap.style.width=cssViewport.width+'px';wrap.style.height=cssViewport.height+'px';const img=document.createElement('img');img.src=canvas.toDataURL('image/png');img.width=Math.ceil(cssViewport.width);img.height=Math.ceil(cssViewport.height);img.style.width=cssViewport.width+'px';img.style.height=cssViewport.height+'px';wrap.appendChild(img);holder.appendChild(wrap);specs.push({element:wrap,width:Math.ceil(cssViewport.width),height:Math.ceil(cssViewport.height),x:(i-1)*(Math.ceil(cssViewport.width)+80),y:0,name:`${file.name} — page ${i}`})}mode='pdf';frameSpecs=specs;empty.style.display='none';stage.classList.add('ready');copyBtn.disabled=false;setStatus(`Ready: ${pdf.numPages} PDF page${pdf.numPages===1?'':'s'}. v0 keeps page contents raster-exact.`,false,true)}catch(err){setStatus(err.message||String(err),true)}}
+let legacyPdfJsPromise=null;
+function loadLegacyPdfJs(){
+  if(window.pdfjsLib?.SVGGraphics)return Promise.resolve(window.pdfjsLib);
+  if(legacyPdfJsPromise)return legacyPdfJsPromise;
+  legacyPdfJsPromise=new Promise((resolve,reject)=>{
+    const existing=document.querySelector('script[data-figma-bridge-pdfjs]');
+    const finish=()=>{
+      const lib=window.pdfjsLib;
+      if(!lib?.SVGGraphics)return reject(new Error('PDF vector engine loaded without SVG support.'));
+      lib.GlobalWorkerOptions.workerSrc='https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.worker.min.js';
+      resolve(lib);
+    };
+    if(existing){existing.addEventListener('load',finish,{once:true});existing.addEventListener('error',()=>reject(new Error('Could not load the PDF vector engine.')),{once:true});if(window.pdfjsLib?.SVGGraphics)finish();return}
+    const s=document.createElement('script');
+    s.src='https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.min.js';
+    s.async=true;s.dataset.figmaBridgePdfjs='true';
+    s.onload=finish;s.onerror=()=>reject(new Error('Could not load the PDF vector engine.'));
+    document.head.appendChild(s);
+  });
+  return legacyPdfJsPromise
+}
+function promotePdfSvgImages(svg,wrap){
+  let promoted=0;
+  const wrapRect=wrap.getBoundingClientRect();
+  for(const el of [...svg.querySelectorAll('image')]){
+    try{
+      const href=el.getAttribute('href')||el.getAttributeNS('http://www.w3.org/1999/xlink','href');
+      if(!href)continue;
+      const r=el.getBoundingClientRect();
+      if(!r.width||!r.height)continue;
+      const img=document.createElement('img');
+      img.src=href;img.alt='';img.decoding='sync';
+      img.style.position='absolute';
+      img.style.left=(r.left-wrapRect.left)+'px';
+      img.style.top=(r.top-wrapRect.top)+'px';
+      img.style.width=r.width+'px';
+      img.style.height=r.height+'px';
+      img.style.objectFit='fill';
+      img.style.zIndex='1';
+      wrap.appendChild(img);
+      el.remove();
+      promoted++
+    }catch{}
+  }
+  return promoted
+}
+async function rasterPdfPage(page,viewport,wrap){
+  const renderViewport=page.getViewport({scale:viewport.scale*2});
+  const canvas=document.createElement('canvas');
+  canvas.width=Math.ceil(renderViewport.width);
+  canvas.height=Math.ceil(renderViewport.height);
+  await page.render({canvasContext:canvas.getContext('2d',{alpha:false}),viewport:renderViewport}).promise;
+  const img=document.createElement('img');
+  img.src=canvas.toDataURL('image/png');
+  img.width=Math.ceil(viewport.width);img.height=Math.ceil(viewport.height);
+  img.style.width=viewport.width+'px';img.style.height=viewport.height+'px';
+  wrap.appendChild(img)
+}
+async function renderPdf(file){
+  if(!file)return;
+  reset();
+  setStatus('Loading PDF reconstruction engine…');
+  try{
+    const pdfjs=await loadLegacyPdfJs();
+    const data=new Uint8Array(await file.arrayBuffer());
+    const pdf=await pdfjs.getDocument({
+      data,
+      isEvalSupported:false,
+      fontExtraProperties:true,
+      isOffscreenCanvasSupported:false,
+      cMapUrl:'https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/cmaps/',
+      cMapPacked:true,
+      standardFontDataUrl:'https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/standard_fonts/'
+    }).promise;
+    stage.style.width='auto';stage.style.height='auto';
+    const holder=document.createElement('div');holder.className='pdf-pages';stage.appendChild(holder);
+    const specs=[];
+    let vectorPages=0,fallbackPages=0,vectorNodes=0,textNodes=0,imageNodes=0;
+    for(let i=1;i<=pdf.numPages;i++){
+      setStatus(\`Reconstructing PDF page \${i} of \${pdf.numPages}…\`);
+      const page=await pdf.getPage(i);
+      const viewport=page.getViewport({scale:96/72});
+      const width=Math.ceil(viewport.width),height=Math.ceil(viewport.height);
+      const wrap=document.createElement('div');
+      wrap.className='pdf-page';
+      wrap.style.width=viewport.width+'px';wrap.style.height=viewport.height+'px';
+      holder.appendChild(wrap);
+      let reconstructed=false;
+      try{
+        const opList=await page.getOperatorList();
+        const gfx=new pdfjs.SVGGraphics(page.commonObjs,page.objs,true);
+        gfx.embedFonts=true;
+        const svg=await gfx.getSVG(opList,viewport);
+        svg.setAttribute('width',String(viewport.width));
+        svg.setAttribute('height',String(viewport.height));
+        svg.style.width=viewport.width+'px';svg.style.height=viewport.height+'px';
+        wrap.appendChild(svg);
+        await new Promise(r=>requestAnimationFrame(r));
+        const promotedImages=promotePdfSvgImages(svg,wrap);
+        const vectors=svg.querySelectorAll('path,rect,circle,ellipse,line,polyline,polygon').length;
+        const texts=svg.querySelectorAll('text,tspan').length;
+        const remainingSvgImages=svg.querySelectorAll('image').length;
+        vectorNodes+=vectors;textNodes+=texts;imageNodes+=promotedImages+remainingSvgImages;
+        if(vectors||texts||promotedImages||remainingSvgImages){
+          reconstructed=true;
+          vectorPages++
+        }
+      }catch(err){
+        console.warn('PDF vector reconstruction failed on page',i,err)
+      }
+      if(!reconstructed){
+        wrap.innerHTML='';
+        await rasterPdfPage(page,viewport,wrap);
+        fallbackPages++
+      }
+      specs.push({element:wrap,width,height,x:(i-1)*(width+80),y:0,name:\`\${file.name} — page \${i}\`});
+      page.cleanup?.()
+    }
+    mode='pdf';frameSpecs=specs;empty.style.display='none';stage.classList.add('ready');copyBtn.disabled=false;
+    const reconstructedLabel=vectorPages?\`\${vectorPages} reconstructed page\${vectorPages===1?'':'s'} · \${vectorNodes} vector shape\${vectorNodes===1?'':'s'} · \${textNodes} text node\${textNodes===1?'':'s'} · \${imageNodes} image\${imageNodes===1?'':'s'}\`:'';
+    const fallbackLabel=fallbackPages?\` · \${fallbackPages} raster fallback page\${fallbackPages===1?'':'s'}\`:'';
+    setStatus(\`Ready: \${pdf.numPages} PDF page\${pdf.numPages===1?'':'s'}. \${reconstructedLabel}\${fallbackLabel}\`,false,true)
+  }catch(err){setStatus(err.message||String(err),true)}
+}
 $('#pdfInput').addEventListener('change',e=>renderPdf(e.target.files[0]));
 function setupDrop(drop,input){['dragenter','dragover'].forEach(ev=>drop.addEventListener(ev,e=>{e.preventDefault();drop.classList.add('drag')}));['dragleave','drop'].forEach(ev=>drop.addEventListener(ev,e=>{e.preventDefault();drop.classList.remove('drag')}));drop.addEventListener('drop',e=>{const f=e.dataTransfer.files?.[0];if(f){const dt=new DataTransfer();dt.items.add(f);input.files=dt.files;input.dispatchEvent(new Event('change'))}})}
 setupDrop($('#htmlDrop'),$('#htmlInput'));setupDrop($('#pdfDrop'),$('#pdfInput'));
