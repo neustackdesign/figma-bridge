@@ -37,7 +37,7 @@ At `http://localhost:3000`:
 - **HTML file** → choose/drop a `.html` file.
 - **Paste HTML / SVG** → paste markup and render it.
 - **Website URL** → fetch the public HTML. For JS-rendered live sites, use the bookmarklet instead.
-- **PDF** → one Figma frame per page, raster content in v0.
+- **PDF** → reconstructs each page from PDF vectors/text/images first; pages fall back to raster only when reconstruction cannot be completed safely.
 
 When the preview says **Ready**:
 
@@ -90,14 +90,14 @@ No backend is required for Figma → HTML.
 
 HTML contains layout semantics, so browser → Figma can preserve editable text and infer native Auto Layout while verifying against measured browser geometry.
 
-PDF is effectively a display list. It does not contain CSS flex/grid or Figma Auto Layout semantics. v0 therefore prioritizes exact page appearance. Editable PDF reconstruction requires a second inference stage for text runs, vectors, groups and layout relationships.
+PDF is effectively a display list. It does not contain CSS flex/grid or Figma Auto Layout semantics. Figma Bridge now reconstructs vector drawing operations, PDF text and embedded imagery into editable browser geometry before handing the result to the Figma converter. That recovers editable primitives, not the original authoring semantics. Auto Layout still requires a separate geometry-inference stage.
 
 Likewise, a generic Figma frame can be exported faithfully to HTML, but Figma prototype interactions are not web application logic. v0 exports the visual document, not application behaviour.
 
 ## Phase 2 candidates
 
 - direct `.fig` / `.deck` ingest and inspection using MIT-licensed [`openfig-core`](https://github.com/OpenFig-org/openfig-core)
-- PDF text/vector extraction and geometry-based grouping before Auto Layout inference
+- PDF geometry-based grouping and Auto Layout inference after primitive reconstruction
 - visual-diff verifier (browser screenshot ↔ Figma export)
 - browser extension for reliable live-page capture, including JS-rendered states
 - CSS grid inference on Figma → HTML where frame geometry indicates grid rather than flex
