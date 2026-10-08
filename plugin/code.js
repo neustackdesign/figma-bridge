@@ -35,16 +35,35 @@ function firstVisiblePaint(paints) {
   return paints.find((p) => p && p.visible !== false) || null;
 }
 
+function gradientStopsCss(paint) {
+  const opacity = paint.opacity == null ? 1 : paint.opacity;
+  return paint.gradientStops.map((s) => {
+    const alpha = (s.color.a == null ? 1 : s.color.a) * opacity;
+    return `${colorToCss(s.color, alpha)} ${Math.round(s.position * 10000) / 100}%`;
+  }).join(', ');
+}
+
+function gradientAngle(paint) {
+  const t = paint?.gradientTransform;
+  if (!Array.isArray(t) || !Array.isArray(t[0])) return 180;
+  const ux = Number(t[0][0]);
+  const uy = Number(t[0][1]);
+  if (!Number.isFinite(ux) || !Number.isFinite(uy) || (Math.abs(ux) < 1e-8 && Math.abs(uy) < 1e-8)) return 180;
+  const deg = Math.atan2(ux, -uy) * 180 / Math.PI;
+  return Math.round(((deg % 360) + 360) % 360 * 1000) / 1000;
+}
+
 function paintToCss(paint) {
   if (!paint) return null;
   if (paint.type === 'SOLID') return colorToCss(paint.color, paint.opacity == null ? 1 : paint.opacity);
   if (paint.type === 'GRADIENT_LINEAR' && Array.isArray(paint.gradientStops)) {
-    const stops = paint.gradientStops.map((s) => `${colorToCss(s.color, s.color.a == null ? 1 : s.color.a)} ${Math.round(s.position * 10000) / 100}%`).join(', ');
-    return `linear-gradient(135deg, ${stops})`;
+    return `linear-gradient(${gradientAngle(paint)}deg, ${gradientStopsCss(paint)})`;
   }
   if (paint.type === 'GRADIENT_RADIAL' && Array.isArray(paint.gradientStops)) {
-    const stops = paint.gradientStops.map((s) => `${colorToCss(s.color, s.color.a == null ? 1 : s.color.a)} ${Math.round(s.position * 10000) / 100}%`).join(', ');
-    return `radial-gradient(circle, ${stops})`;
+    return `radial-gradient(ellipse at center, ${gradientStopsCss(paint)})`;
+  }
+  if (paint.type === 'GRADIENT_ANGULAR' && Array.isArray(paint.gradientStops)) {
+    return `conic-gradient(from ${gradientAngle(paint)}deg, ${gradientStopsCss(paint)})`;
   }
   return null;
 }
@@ -137,9 +156,13 @@ function layoutCss(node) {
   const dir = node.layoutMode === 'HORIZONTAL' ? 'row' : 'column';
   const justify = { MIN: 'flex-start', CENTER: 'center', MAX: 'flex-end', SPACE_BETWEEN: 'space-between' }[node.primaryAxisAlignItems] || 'flex-start';
   const align = { MIN: 'flex-start', CENTER: 'center', MAX: 'flex-end', BASELINE: 'baseline' }[node.counterAxisAlignItems] || 'flex-start';
+  const alignContent = { MIN: 'flex-start', CENTER: 'center', MAX: 'flex-end', SPACE_BETWEEN: 'space-between' }[node.counterAxisAlignContent] || 'normal';
   const wrap = node.layoutWrap === 'WRAP' ? 'wrap' : 'nowrap';
-  const gap = typeof node.itemSpacing === 'number' ? px(node.itemSpacing) : '0px';
-  return `display:flex;flex-direction:${dir};flex-wrap:${wrap};justify-content:${justify};align-items:${align};gap:${gap};padding:${px(node.paddingTop || 0)} ${px(node.paddingRight || 0)} ${px(node.paddingBottom || 0)} ${px(node.paddingLeft || 0)};`;
+  const primaryGap = typeof node.itemSpacing === 'number' ? px(node.itemSpacing) : '0px';
+  const crossGap = node.layoutWrap === 'WRAP' && typeof node.counterAxisSpacing === 'number' ? px(node.counterAxisSpacing) : primaryGap;
+  const rowGap = dir === 'row' ? crossGap : primaryGap;
+  const columnGap = dir === 'row' ? primaryGap : crossGap;
+  return `display:flex;flex-direction:${dir};flex-wrap:${wrap};justify-content:${justify};align-items:${align};align-content:${alignContent};row-gap:${rowGap};column-gap:${columnGap};padding:${px(node.paddingTop || 0)} ${px(node.paddingRight || 0)} ${px(node.paddingBottom || 0)} ${px(node.paddingLeft || 0)};`;
 }
 
 function sizingCss(node, parentIsAuto) {
@@ -228,14 +251,14 @@ async function renderText(node, parent) {
   } catch {
     inner = `<span>${inner}</span>`;
   }
-  return `<div class="relay-node relay-text" data-figma-id="${esc(node.id)}" data-figma-name="${esc(node.name)}" style="${base}">${inner}</div>`;
+  return `<div class="bridge-node bridge-text" data-figma-id="${esc(node.id)}" data-figma-name="${esc(node.name)}" style="${base}">${inner}</div>`;
 }
 
 async function renderVector(node, parent) {
   try {
     const svg = await node.exportAsync({ format: 'SVG_STRING' });
     const css = `${placementCss(node, parent)}${sizingCss(node, !!parent && 'layoutMode' in parent && parent.layoutMode !== 'NONE')}${opacityCss(node)}${blendCss(node)}overflow:visible;`;
-    return `<div class="relay-node relay-vector" data-figma-id="${esc(node.id)}" data-figma-name="${esc(node.name)}" style="${css}">${svg}</div>`;
+    return `<div class="bridge-node bridge-vector" data-figma-id="${esc(node.id)}" data-figma-name="${esc(node.name)}" style="${css}">${svg}</div>`;
   } catch {
     return renderRaster(node, parent);
   }
@@ -244,7 +267,7 @@ async function renderVector(node, parent) {
 async function renderRaster(node, parent) {
   const bytes = await node.exportAsync({ format: 'PNG', constraint: { type: 'SCALE', value: 2 } });
   const css = `${placementCss(node, parent)}${sizingCss(node, !!parent && 'layoutMode' in parent && parent.layoutMode !== 'NONE')}${opacityCss(node)}${blendCss(node)}object-fit:contain;display:block;`;
-  return `<img class="relay-node relay-raster" data-figma-id="${esc(node.id)}" data-figma-name="${esc(node.name)}" alt="" src="data:image/png;base64,${base64(bytes)}" style="${css}"/>`;
+  return `<img class="bridge-node bridge-raster" data-figma-id="${esc(node.id)}" data-figma-name="${esc(node.name)}" alt="" src="data:image/png;base64,${base64(bytes)}" style="${css}"/>`;
 }
 
 async function renderContainer(node, parent) {
@@ -264,7 +287,7 @@ async function renderContainer(node, parent) {
   const children = 'children' in node ? node.children : [];
   const rendered = [];
   for (const child of children) rendered.push(await renderNode(child, node));
-  return `<div class="relay-node relay-container" data-figma-id="${esc(node.id)}" data-figma-name="${esc(node.name)}" style="${css}">${rendered.join('')}</div>`;
+  return `<div class="bridge-node bridge-container" data-figma-id="${esc(node.id)}" data-figma-name="${esc(node.name)}" style="${css}">${rendered.join('')}</div>`;
 }
 
 async function renderNode(node, parent = null) {
@@ -278,10 +301,10 @@ async function renderNode(node, parent = null) {
       let css = `${placementCss(node, parent)}${sizingCss(node, !!parent && 'layoutMode' in parent && parent.layoutMode !== 'NONE')}box-sizing:border-box;${radiusCss(node)}${strokeCss(node)}${effectsCss(node)}${opacityCss(node)}${blendCss(node)}`;
       const paint = node.fills.find((p) => p && p.visible !== false && p.type === 'IMAGE');
       try { css += await imagePaintCss(paint); } catch (_) { return renderRaster(node, parent); }
-      return `<div class="relay-node relay-image" data-figma-id="${esc(node.id)}" data-figma-name="${esc(node.name)}" style="${css}"></div>`;
+      return `<div class="bridge-node bridge-image" data-figma-id="${esc(node.id)}" data-figma-name="${esc(node.name)}" style="${css}"></div>`;
     }
     const css = `${placementCss(node, parent)}${sizingCss(node, !!parent && 'layoutMode' in parent && parent.layoutMode !== 'NONE')}box-sizing:border-box;${nodeBackgroundCss(node)}${radiusCss(node)}${strokeCss(node)}${effectsCss(node)}${opacityCss(node)}${blendCss(node)}`;
-    return `<div class="relay-node relay-rect" data-figma-id="${esc(node.id)}" data-figma-name="${esc(node.name)}" style="${css}"></div>`;
+    return `<div class="bridge-node bridge-rect" data-figma-id="${esc(node.id)}" data-figma-name="${esc(node.name)}" style="${css}"></div>`;
   }
   try { return await renderRaster(node, parent); } catch { return ''; }
 }
@@ -299,7 +322,7 @@ function htmlDocument(body, title, width, height) {
 <meta name="viewport" content="width=device-width,initial-scale=1"/>
 <title>${esc(title)}</title>
 <style>
-*{box-sizing:border-box}html,body{margin:0;min-height:100%;background:#fff}.relay-canvas{position:relative;width:${px(width)};height:${px(height)};overflow:visible}.relay-node{box-sizing:border-box}.relay-vector>svg{display:block;width:100%;height:100%}.relay-text{word-break:normal}
+*{box-sizing:border-box}html,body{margin:0;min-height:100%;background:#fff}.bridge-canvas{position:relative;width:${px(width)};height:${px(height)};overflow:visible}.bridge-root{position:absolute}.bridge-root>.bridge-node{left:0!important;top:0!important}.bridge-node{box-sizing:border-box}.bridge-vector>svg{display:block;width:100%;height:100%}.bridge-text{word-break:normal}
 </style>
 </head>
 <body>
@@ -312,25 +335,23 @@ async function exportSelection() {
   const selection = figma.currentPage.selection;
   if (!selection.length) throw new Error('Select at least one frame or layer first.');
 
-  const minX = Math.min(...selection.map((n) => n.x));
-  const minY = Math.min(...selection.map((n) => n.y));
-  const maxX = Math.max(...selection.map((n) => n.x + n.width));
-  const maxY = Math.max(...selection.map((n) => n.y + n.height));
   const gap = 80;
-
   const outputs = [];
   let cursorX = 0;
   let canvasH = 0;
+
   for (const node of selection) {
     const raw = await renderNode(node, null);
-    const rewritten = raw.replace('style="', `style="position:absolute;left:${px(cursorX)};top:0;`);
-    outputs.push(rewritten);
+    outputs.push(
+      `<div class="bridge-root" style="position:absolute;left:${px(cursorX)};top:0;width:${px(node.width)};height:${px(node.height)};">${raw}</div>`
+    );
     cursorX += node.width + gap;
     canvasH = Math.max(canvasH, node.height);
   }
+
   const canvasW = Math.max(1, cursorX - gap);
   const title = selection.length === 1 ? selection[0].name : `${figma.currentPage.name} export`;
-  const body = `<main class="relay-canvas">${outputs.join('')}</main>`;
+  const body = `<main class="bridge-canvas">${outputs.join('')}</main>`;
   return { html: htmlDocument(body, title, canvasW, canvasH), filename: safeFilename(title), count: selection.length };
 }
 
