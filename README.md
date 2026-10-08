@@ -81,6 +81,7 @@ In **Figma Desktop**:
 - solid fills, borders, radii and shadows → CSS
 - image fills → embedded data URIs
 - unsupported/complex node types → embedded PNG fallback
+- multiple selected roots → stable side-by-side export without root-position collisions
 
 No backend is required for Figma → HTML.
 
@@ -107,7 +108,7 @@ Likewise, a generic Figma frame can be exported faithfully to HTML, but Figma pr
 
 Script-backed local/pasted HTML is executed only in a sandboxed iframe without `allow-same-origin`, so it cannot access the parent Figma Bridge page or its storage. Public URL import does not execute fetched third-party scripts inside Figma Bridge; use the live-page bookmarklet for those cases.
 
-The URL proxy rejects obvious local/private IPv4 ranges, localhost and credential-bearing URLs, caps redirects, and limits response sizes. It is intentionally not a general-purpose fetch proxy.
+The URL proxy rejects credential-bearing URLs, literal private/reserved IPv4 and IPv6 ranges, and hostnames that resolve to private/local addresses. Redirect targets are revalidated, response bodies are size-limited while streaming, and asset mode rejects non-image/non-font content. It is intentionally not a general-purpose fetch proxy.
 
 ## License note
 
