@@ -26,6 +26,8 @@ jobs:
           for i in $(seq 1 25); do if curl -fsS http://127.0.0.1:3200/ >/dev/null; then break; fi; sleep 1; done
       - name: Confirm browser preview produces non-empty Figma clipboard payload
         run: node tests/clipboard-smoke.mjs
+      - name: Exercise Figma plugin's actual HTML exporter with synthetic layers
+        run: node tests/exporter-smoke.mjs
       - name: Retain browser proof without implying native Figma paste
         if: always()
         uses: actions/upload-artifact@v4
