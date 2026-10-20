@@ -79,6 +79,64 @@ async function guideScroll(tabId,duration){
     state.error='Auto-scroll was blocked on this page. Try manual interaction mode.';
   }
 }
+
+/** Natural wheel: CDP synthesises trusted wheel input rather than jumping scrollTop.
+ * This is intentionally a separate strategy for virtual/gesture-driven sites.
+ * It leaves the site's own smooth scroller and scroll-trigger timeline in control.
+ */
+async function guideWheel(tabId,durationMs) {
+  let attached=false;
+  const sleep=ms=>new Promise(resolve=>setTimeout(resolve,ms));
+  const original=await chrome.scripting.executeScript({
+    target:{tabId},world:'MAIN',
+    func:()=>{
+      const doc=document.documentElement,body=document.body;
+      const virtual=window.ScrollSmoother?.get?.()?.scrollTop?.()??window.lenis?.scroll??null;
+      return {x:scrollX,y:scrollY,virtual,
+        range:Math.max(0,doc.scrollHeight-innerHeight,(body?.scrollHeight||0)-innerHeight),
+        width:innerWidth,height:innerHeight};
+    }
+  });
+  const info=original?.[0]?.result||{};
+  try {
+    await chrome.debugger.attach({tabId},'1.3');attached=true;
+    const activeTime=Math.max(1300,durationMs-1600);
+    const interval=200;
+    const steps=Math.max(5,Math.floor(activeTime/interval));
+    const delta=Math.max(100,Math.min(550,Math.ceil((info.range||steps*210)/Math.max(1,steps*.88))));
+    const x=Math.max(40,Math.floor((info.width||1200)*.55));
+    const y=Math.max(50,Math.floor((info.height||800)*.52));
+    const started=Date.now();
+    for(let n=0;n<steps;n++){
+      if(state.phase!=='recording'||state.tabId!==tabId)break;
+      // Slightly slower towards the beginning/end: visible introductions and footer.
+      const t=n/steps;
+      const ease=t<.08?.55:t>.91?.6:1;
+      await chrome.debugger.sendCommand({tabId},'Input.dispatchMouseEvent',{
+        type:'mouseWheel',x,y,deltaX:0,deltaY:Math.round(delta*ease),modifiers:0,pointerType:'mouse'
+      });
+      const next=started+(n+1)*interval;
+      if(next>Date.now())await sleep(next-Date.now());
+    }
+    // Let momentum/interpolated transforms finish before the recorder ends.
+    if(state.phase==='recording')await sleep(300);
+  }catch(error){
+    state.error='Natural wheel input was blocked: '+(error.message||String(error));
+  }finally{
+    if(attached)try{await chrome.debugger.detach({tabId});}catch{}
+    try{
+      if(state.tabId===tabId){
+        await chrome.scripting.executeScript({target:{tabId},world:'MAIN',args:[info],func:saved=>{
+          const smoother=window.ScrollSmoother?.get?.();
+          if(smoother&&typeof saved.virtual==='number')smoother.scrollTop(saved.virtual,false);
+          else if(window.lenis&&typeof saved.virtual==='number')window.lenis.scrollTo(saved.virtual,{immediate:true,force:true});
+          window.scrollTo(saved.x||0,saved.y||0);window.ScrollTrigger?.update?.();
+        }});
+      }
+    }catch{}
+  }
+}
+
 async function startRecord(message){
   if(state.phase!=='idle')throw Error('A capture is already running. Stop it before starting another.');
   const tabId=Number(message.tabId);
@@ -88,6 +146,7 @@ async function startRecord(message){
   const mode=['guided','fixed','manual'].includes(message.mode)?message.mode:'guided';
   const duration=Math.max(6,Math.min(format==='gif'?30:60,Number(message.duration)||20));
   const quality=format==='gif'?560:Number(message.quality)===1080?1080:720;
+  const driver=message.driver==='position'?'position':'wheel';
   state.phase='starting';state.tabId=tabId;state.mode=mode;state.format=format;state.error=null;state.downloadId=null;
   try{
     // Issue the privileged stream request while handling the explicit user gesture.
@@ -96,7 +155,10 @@ async function startRecord(message){
     const response=await chrome.runtime.sendMessage({target:'offscreen',type:'record-start',streamId,format,mode,duration,quality,hostname:new URL(tab.url).hostname});
     if(!response?.ok)throw Error(response?.error||'Could not start the offscreen recorder.');
     state.phase='recording';state.startedAt=Date.now();await notify();
-    if(mode==='guided')void guideScroll(tabId,duration*1000);
+    if(mode==='guided'){
+      if(driver==='wheel')void guideWheel(tabId,duration*1000);
+      else void guideScroll(tabId,duration*1000);
+    }
     return{ok:true};
   }catch(error){
     state.phase='idle';state.tabId=null;await notify();
