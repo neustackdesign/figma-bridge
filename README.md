@@ -36,7 +36,7 @@ At `http://localhost:3000`:
 
 - **HTML file** → choose/drop a `.html` file.
 - **Paste HTML / SVG** → paste markup and render it.
-- **Website URL** → fetch the public HTML. For JS-rendered live sites, use the bookmarklet instead.
+- **Website URL** → fetch the public server HTML. It cannot execute third-party website scripts. For live, JS-rendered, GSAP or scroll-reveal states, use the bookmarklet for editable DOM layers; for Canvas/WebGL and visual fidelity, use the browser-native image exporter below.
 - **PDF** → reconstructs each page from PDF vectors/text/images first; pages fall back to raster only when reconstruction cannot be completed safely.
 
 When the preview says **Ready**:
@@ -50,6 +50,23 @@ Static HTML is inspected directly. Packaged HTML containing JavaScript is render
 Auto Layout is inferred by `@figit/dom-to-figma` for flex, grid, wrapping and block flow when the browser geometry can be reproduced exactly; otherwise that container falls back to absolute positioning.
 
 The browser conversion engine is the MIT-licensed [`@figit/dom-to-figma`](https://github.com/figitdesign/web-to-figma) package rather than a Neustack reimplementation.
+
+## Full-page PNG / JPG from animated live websites
+
+Bridge also includes a browser-native [Chrome / Edge extension](./extension/) for full-height screenshots. Use this when you need the **actual rendered pixels** of GSAP/ScrollTrigger, smooth-scrolling, video, Canvas, WebGL or otherwise heavily animated websites.
+
+1. Download/clone this repository and open `chrome://extensions` (Edge: `edge://extensions`).
+2. Turn on Developer mode, choose **Load unpacked**, and select the `extension/` directory.
+3. Visit the source website directly, then use the **Figma Bridge — Full-page Capture** toolbar action.
+4. Choose **Export PNG** or **Export JPG**. Chrome downloads one stitched, full-height image.
+
+The companion operates **locally**, uses the existing browser render output, has no server-side screenshot service, and releases its temporary debugger session after capture. It does not produce editable Figma layers. Scroll-driven pinned elements/sticky headers can repeat in a stitched static image; DRM video and arbitrary locked scrollers remain limitations.
+
+### Live-page editable Figma import
+
+For editable DOM content, use **Copy live-page bookmarklet** in Bridge, install it as a browser bookmark, then run it on the site you are viewing. The bookmarklet scrolls to prime lazy content and reveal states, tries to coordinate GSAP/ScrollTrigger, and presents a **Copy to Figma** button after conversion. Click that button before pasting into Figma: the additional click is important because a long conversion expires the browser's clipboard user-activation permission.
+
+The live-page bookmarklet still depends on the source website's content-security policy allowing the converter module, and Canvas/WebGL frames are not natively editable. The image exporter is the fidelity fallback for these sites.
 
 ## Install the Figma → HTML exporter
 
@@ -100,7 +117,7 @@ Likewise, a generic Figma frame can be exported faithfully to HTML, but Figma pr
 - direct `.fig` / `.deck` ingest and inspection using MIT-licensed [`openfig-core`](https://github.com/OpenFig-org/openfig-core)
 - PDF geometry-based grouping and Auto Layout inference after primitive reconstruction
 - visual-diff verifier (browser screenshot ↔ Figma export)
-- browser extension for reliable live-page capture, including JS-rendered states
+- direct hybrid imports: editable DOM plus raster fallbacks for unsupported Canvas/WebGL regions
 - CSS grid inference on Figma → HTML where frame geometry indicates grid rather than flex
 - prototype/interactions → links, hover/pressed states and lightweight JS where mappings are deterministic
 
