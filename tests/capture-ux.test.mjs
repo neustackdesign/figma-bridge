@@ -19,6 +19,8 @@ for(const link of ['https://bridge.neustackstudio.com/','https://github.com/neus
 assert.match(html,/id="export"/);
 assert.match(html,/type:'export-html'/);
 assert.match(html,/target="_blank"/);
+assert.match(html,/type:'open-external'/);
+assert.match(await fs.readFile('plugin/code.js','utf8'),/figma\.openExternal\(message\.url\)/);
 
 for(const id of ['sceneFrames','inspectPage','motionMode','motionFormat','motionDriver','motionDuration','motionQuality','startRecord','stopRecord']){
   assert.ok(popup.includes('id="'+id+'"'),'missing UI control '+id);
