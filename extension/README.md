@@ -5,7 +5,7 @@ The Chrome/Edge companion captures rendered websites locally. It supports GSAP/S
 ## Install a ready-to-use build (recommended)
 
 1. Open the [Bridge Motion recording workflow](https://github.com/neustackdesign/figma-bridge/actions/workflows/motion-capture.yml) and select the latest successful run.
-2. Download its **figma-bridge-capture-extension** artifact and unzip the packaged `bridge-capture-extension.zip`.
+2. Download its **figma-bridge-complete-toolkit** artifact and unzip `figma-bridge-complete-toolkit.zip`. This contains `extension/` and `figma-plugin/`.
 3. Open `chrome://extensions` (Edge: `edge://extensions`), turn on Developer mode, choose **Load unpacked**, and choose the extracted `extension` directory.
 4. Pin **Figma Bridge — Capture** to the browser toolbar.
 
@@ -13,7 +13,7 @@ Install from source, if preferred: clone/download the repository, run `npm insta
 
 ## Full-page still images
 
-Open a page, choose **Export PNG** or **Export JPG**. The extension scrolls the real page to trigger lazy content, captures each section with the browser compositor, then stitches a full-height image. Existing limitations: some sticky/pinned elements may repeat, and arbitrary scroll locks may prevent reliable stitching.
+Open a page, choose **Export PNG** or **Export JPG**. The extension scrolls the real page to trigger lazy content, captures each section with the browser compositor, then stitches a full-height image. Use **Capture 8 scene frames (PNG)** for transforming, sticky/pinned or virtual-scroll experiences: each frame represents a separate viewport moment, not an impossible flattened montage. **Diagnose this website** reveals the page's GSAP pins, Canvas surfaces, scrolling engine and size. Existing limitations: some sticky/pinned elements may repeat, and arbitrary scroll locks may prevent reliable stitching.
 
 ## Capture animations as MP4/GIF
 
@@ -22,6 +22,8 @@ Open the source page, click the extension, choose a workflow, format, duration a
 - **Guided full-page scroll** — captures the live viewport while Bridge automatically scrolls the page, triggering scroll-linked animations and rendering actual video/Canvas/WebGL pixels. Allows 10–60 seconds for MP4.
 - **Fixed viewport / loop** — records the visible hero, animated illustration, background or looping interaction without scrolling.
 - **Manual interactions** — records what happens while you scroll, hover and click yourself. Reopen the extension popup to select **Stop and export** before the recording duration elapses.
+
+For **Guided full-page scroll**, leave **Natural wheel** selected. It sends browser-trusted wheel input to the source page, which lets GSAP/ScrollTrigger, Lenis and virtual-scroll handlers progress naturally. Use **Position-based** only for conventional native-scrolling pages. For custom drag-based effects, select **Manual interactions** instead.
 
 ### Encoding limits
 
@@ -46,3 +48,7 @@ GIF is better for short, loopable elements; MP4 is preferable for high-detail, p
 
 This is a capture tool for user-authorised material. It does not bypass DRM or reconstruct protected streaming media.
 
+
+## Why the Figma plugin has different controls
+
+Bridge consists of three execution environments: a browser app for HTML/PDF/website → Figma, a Chrome extension for rendered screenshots and recordings, and a Figma plugin for Figma → HTML. Figma plugins cannot capture live Chrome tabs. The updated Figma plugin's Overview, Web → Figma, Capture and Figma → Web tabs show the full product with links to the right environment. The CI toolkit also includes an updated `figma-plugin/` folder; use its `manifest.json` to update the local development plugin.
