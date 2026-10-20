@@ -65,7 +65,7 @@ function scrollExpression(y) {
  * purported "full page". An intro often reports exactly one viewport in height
  * until its GSAP/WebGL sequence completes.
  */
-async function waitForIntro(tabId){
+async function waitForIntro(tabId,allowVirtual=false){
   const probe=`(() => {
     const d=document.documentElement,b=document.body||d;
     return {
@@ -88,7 +88,7 @@ async function waitForIntro(tabId){
   // Still a single virtual viewport after the intro. This is not a legitimate
   // multi-section full-page screenshot; provide a more accurate recovery path.
   const current=await evaluate(tabId,probe);
-  if(current&&current.height<=current.viewport*1.1){
+  if(current&&current.height<=current.viewport*1.1&&!allowVirtual){
     throw new Error('This site uses an animated fullscreen/virtual-scroll scene, not a normal full page. Use "Capture 8 scene frames" or Guided scroll → MP4 (Natural wheel) to preserve its visual states.');
   }
 }
@@ -262,6 +262,7 @@ async function captureSceneFrames(){
     await chrome.debugger.sendCommand({tabId},'Runtime.enable');
     original=await evaluate(tabId,dimensionsScript);
     if(!original?.viewportWidth||!original?.viewportHeight)throw Error('Cannot measure this page.');
+    await waitForIntro(tabId,true); // Retain virtual-scroll sequences but skip unfinished page loaders.
     const count=8,maxScroll=Math.max(0,original.height-original.viewportHeight);
     const delta=Math.max(170,Math.min(700,Math.ceil(maxScroll/((count-1)*4))));
     await evaluate(tabId,scrollExpression(0));
