@@ -13,13 +13,15 @@ button.secondary{background:white;color:#171713}button:disabled{opacity:.45;curs
 select{width:100%;height:37px;background:#fff;border:1px solid #c9c9c3;border-radius:6px;color:#222;font-size:12px;padding:0 7px}
 .help{font-size:11px;color:#61625b;margin:8px 0 11px}
 #status{border-top:1px solid #d8d8d2;padding-top:12px;min-height:34px;overflow-wrap:break-word;font-size:12px}
-a{color:inherit}small{color:#6d6e67;font-size:11px;display:block;line-height:1.4;margin-top:10px}
+a{color:inherit}.actionLink{background:#fff;border:1px solid #d1cec7;border-radius:6px;padding:8px 10px;text-decoration:none;font-size:11px;font-weight:600}.actions:has(.actionLink){grid-template-columns:1fr 1fr}small{color:#6d6e67;font-size:11px;display:block;line-height:1.4;margin-top:10px}
 #stopRecord{display:none;width:100%;background:#a83624;border-color:#a83624}
 </style></head><body>
 <h1>Figma Bridge</h1>
 <p>Capture the real rendered website — static frames or scroll-driven animations.</p>
-<section class="section" aria-label="Still image export"><h2>Full-page image</h2>
-<div class="actions"><button data-format="png">Export PNG</button><button class="secondary" data-format="jpeg">Export JPG</button></div>
+<section class="section" aria-label="Still image export"><h2>Still image capture</h2>
+<div class="actions"><button data-format="png">Full-page PNG</button><button class="secondary" data-format="jpeg">Full-page JPG</button></div>
+<div class="actions"><button class="secondary" id="sceneFrames">Capture 8 scene frames (PNG)</button></div>
+<p class="help">A full-page image flattens animations. Scene frames preserve eight separate moments, especially for pinned and transforming sections.</p>
 </section>
 <section class="section" aria-label="Motion capture"><h2>Animation recording</h2>
 <div class="form">
@@ -27,10 +29,13 @@ a{color:inherit}small{color:#6d6e67;font-size:11px;display:block;line-height:1.4
 <div><label for="motionFormat">Export</label><select id="motionFormat"><option value="mp4">MP4 · H.264</option><option value="gif">Animated GIF</option></select></div>
 <div><label for="motionDuration">Duration</label><select id="motionDuration"><option value="10">10 seconds</option><option value="20" selected>20 seconds</option><option value="30">30 seconds</option><option value="45">45 seconds</option><option value="60">60 seconds</option></select></div>
 <div><label for="motionQuality">Resolution</label><select id="motionQuality"><option value="720">720p · recommended</option><option value="1080">1080p · MP4 only</option></select></div>
+<div style="grid-column:span 2"><label for="motionDriver">Scroll method (guided only)</label>
+<select id="motionDriver"><option value="wheel">Natural wheel · best for animated sites</option><option value="position">Position-based · conventional pages</option></select></div>
 </div>
 <div id="motionHelp" class="help">Scrolls through the site and records each animation in motion. Keep the target tab visible.</div>
 <button id="startRecord" style="width:100%">Record animation</button><button id="stopRecord">Stop and export</button>
 </section>
+<section class="section"><h2>Import and design export</h2><p>Convert HTML, SVG, PDF and web pages into editable Figma layers in the browser app. Export Figma layers back to HTML with the separate Figma plugin.</p><div class="actions"><a class="actionLink" href="https://bridge.neustackstudio.com/" target="_blank" rel="noopener noreferrer">Open Bridge app ↗</a><a class="actionLink" href="https://bridge.neustackstudio.com/plugin/" target="_blank" rel="noopener noreferrer">Figma exporter ↗</a></div></section>
 <p id="status" role="status" aria-live="polite">Open the page you want to capture.</p>
 <small>On-device capture, no upload. JPG/PNG uses Chrome's screenshot renderer. MP4/GIF records the current viewport over time. Animation recording requires Chrome 116+ and may use significant memory for longer or high-resolution recordings. <a href="https://bridge.neustackstudio.com/">Open Bridge</a></small>
 <script src="popup.js"></script>
