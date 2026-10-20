@@ -234,8 +234,10 @@ if(diagnoseButton)diagnoseButton.addEventListener('click',async()=>{
     });
     const d=result?.[0]?.result;
     if(!d)throw Error('Could not inspect this website.');
-    const virtual=d.locked||d.lenis||d.smoother||d.scrollables>0||d.pinned>0;
-    const advice=virtual?'Recommended: Natural wheel MP4, or Scene frames.':'Recommended: Full-page PNG/JPG or position-based MP4.';
+    const viewportHeight=Number(d.viewport.split(' × ')[1])||1;
+    const fullscreenSequence=d.pageHeight<=viewportHeight*1.1&&(d.triggers>=8||d.canvas>0);
+    const virtual=fullscreenSequence||d.locked||d.lenis||d.smoother||d.scrollables>0||d.pinned>0;
+    const advice=virtual?'Recommended: Natural wheel MP4 or eight Scene frames. A single full-page image cannot include all the animated states.':'Recommended: Full-page PNG/JPG or position-based MP4.';
     diagnostics.textContent='Viewport '+d.viewport+'; page height '+d.pageHeight+'px. '
       +d.triggers+' GSAP triggers ('+d.pinned+' pinned); '+d.canvas+' canvas; '
       +(d.locked?'scroll locked; ':'')+(d.lenis?'Lenis; ':'')+(d.smoother?'ScrollSmoother; ':'')
