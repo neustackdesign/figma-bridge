@@ -93,7 +93,7 @@ async function startRecord(message){
     // Issue the privileged stream request while handling the explicit user gesture.
     const streamId=await chrome.tabCapture.getMediaStreamId({targetTabId:tabId});
     await ensureOffscreen();
-    const response=await chrome.runtime.sendMessage({target:'offscreen',type:'record-start',streamId,format,mode,duration,quality});
+    const response=await chrome.runtime.sendMessage({target:'offscreen',type:'record-start',streamId,format,mode,duration,quality,hostname:new URL(tab.url).hostname});
     if(!response?.ok)throw Error(response?.error||'Could not start the offscreen recorder.');
     state.phase='recording';state.startedAt=Date.now();await notify();
     if(mode==='guided')void guideScroll(tabId,duration*1000);
@@ -117,6 +117,7 @@ async function stopRecord(){
 async function completeCapture(message){
   if(state.phase==='idle')return;
   state.phase='saving';await notify();
+  await stopPageScroll(state.tabId);
   const hostname=(message.hostname||'website').replace(/[^a-z0-9.-]+/gi,'-').slice(0,70);
   const filename='figma-bridge/'+hostname+'-'+state.mode+'-'+new Date().toISOString().replace(/[:.]/g,'-')+'.'+state.format;
   try{
