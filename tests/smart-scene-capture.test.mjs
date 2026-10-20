@@ -60,7 +60,7 @@ class ImageMock{
 }
 const URLMock=Object.assign(class extends URL{},{createObjectURL:()=> 'blob:bridge',revokeObjectURL:()=>{}});
 const sandbox={document,chrome,Image:ImageMock,URL:URLMock,Date,Number,Math,JSON,Promise,Error,
-  console,setTimeout,clearTimeout};
+  console,setTimeout:(fn,ms)=>ms===60000?0:setTimeout(fn,ms),clearTimeout};
 vm.runInNewContext(screenshotModule,sandbox);
 await button.click();
 assert.ok(seenWheel>=7,'virtual-scene capture must advance with trusted wheel input');
