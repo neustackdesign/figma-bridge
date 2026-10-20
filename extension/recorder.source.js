@@ -80,9 +80,12 @@ async function start(message){
     const active={
       ...options,stream,video,canvas,ctx,width,height,fps,gif,encoder,muxer,
       started:performance.now(),lastSample:-Infinity,frames:0,raf:null,timer:null,
-      stopping:false,failure:null,ended:false
+      stopping:false,failure:null,ended:false,heartbeat:null
     };
     session=active;
+    // MV3 service workers may suspend during fixed/manual recordings with no
+    // active debugger traffic. Ping while the offscreen stream is alive.
+    active.heartbeat=setInterval(()=>void notify('record-heartbeat'),10000);
     stream.getVideoTracks().forEach(track=>track.addEventListener('ended',()=>{
       if(session===active&&!active.stopping)void stop('The captured tab stopped sharing.');
     }));
@@ -129,6 +132,7 @@ async function stop(reason=null){
   if(!active||active.stopping)return{ok:true};
   active.stopping=true;
   clearTimeout(active.timer);
+  clearInterval(active.heartbeat);
   if(active.raf!==null)cancelAnimationFrame(active.raf);
   // Release capture as soon as frame sampling has stopped.
   active.stream.getTracks().forEach(track=>track.stop());
