@@ -3,8 +3,10 @@ on:
   push:
     paths:
       - extension/**
+      - plugin/**
       - package.json
       - tests/motion-capture.test.mjs
+      - tests/capture-ux.test.mjs
       - .github/workflows/motion-capture.yml
   pull_request:
     paths:
@@ -30,6 +32,10 @@ jobs:
         run: npm run build:extension
       - name: Run recording regressions
         run: node tests/motion-capture.test.mjs
+      - name: Validate all Bridge workflow surfaces
+        run: |
+          node tests/capture-ux.test.mjs
+          node tests/exporter-smoke.mjs
       - name: Validate bundled script exists
         run: test -s extension/recorder.js
       - name: Package Chrome extension and updated Figma companion
