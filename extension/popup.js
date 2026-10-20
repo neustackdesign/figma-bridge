@@ -126,6 +126,131 @@ async function screenshot(tabId) {
   return image;
 }
 
+
+/**
+ * A motion-driven, viewport-sized scene cannot be stitched into a spatial page.
+ * Capture successive actual rendered states as one clearly labelled storyboard.
+ * Unlike a synthetic tall DOM screenshot, this preserves visual transitions.
+ */
+const scrollModelScript=`(() => {
+  const de=document.documentElement,body=document.body||de;
+  const viewport=innerHeight;
+  const documentHeight=Math.max(de.scrollHeight,body.scrollHeight);
+  const triggerCount=window.ScrollTrigger?.getAll?.().length||0;
+  const hasCanvas=!!document.querySelector('canvas');
+  const tallPinned=[...document.querySelectorAll('main,section,[data-scroll-container],[class*="pin"],[class*="sticky"]')]
+    .slice(0,300).filter(el=>{
+      const rect=el.getBoundingClientRect();
+      if(rect.height<viewport*.4)return false;
+      const p=getComputedStyle(el).position;
+      return p==='sticky'||p==='fixed';
+    }).length;
+  const virtual=documentHeight<=viewport*1.15&&(hasCanvas||triggerCount>=6);
+  return{virtual,tallPinned,triggerCount,hasCanvas,documentHeight,viewport};
+})()`;
+
+function imageDifference(a,b){
+  if(!a||!b)return Infinity;
+  const canvas=document.createElement('canvas');
+  canvas.width=96;canvas.height=64;
+  const ctx=canvas.getContext('2d',{willReadFrequently:true});
+  const values=image=>{
+    ctx.clearRect(0,0,96,64);
+    ctx.drawImage(image,0,0,96,64);
+    return ctx.getImageData(0,0,96,64).data;
+  };
+  const first=values(a),last=values(b);
+  let changed=0;
+  for(let i=0;i<first.length;i+=4){
+    const delta=Math.abs(first[i]-last[i])+Math.abs(first[i+1]-last[i+1])+Math.abs(first[i+2]-last[i+2]);
+    if(delta>70)changed++;
+  }
+  return changed/(96*64);
+}
+
+async function saveCaptureBlob(blob,hostname,suffix,extension){
+  if(!blob?.size)throw Error('Capture produced no image data.');
+  const url=URL.createObjectURL(blob);
+  try{
+    await chrome.downloads.download({
+      url,filename:'figma-bridge/'+hostname+'-'+suffix+'-'+new Date().toISOString().slice(0,10)+'.'+extension,
+      saveAs:false,conflictAction:'uniquify'
+    });
+  }finally{
+    setTimeout(()=>URL.revokeObjectURL(url),60000);
+  }
+}
+
+async function captureSceneSheet(tabId,hostname,format,metrics,{count=8}={}){
+  const width=metrics.viewportWidth,height=metrics.viewportHeight;
+  const frames=[];
+  // Retain current scene as the first frame; no unwanted forced GSAP rewind.
+  let last=await screenshot(tabId);
+  frames.push(last);
+  const x=Math.max(40,Math.floor(width*.54)),y=Math.max(40,Math.floor(height*.55));
+  for(let i=1;i<count;i++){
+    let next=null;
+    for(let attempt=0;attempt<8;attempt++){
+      await chrome.debugger.sendCommand({tabId},'Input.dispatchMouseEvent',{
+        type:'mouseWheel',x,y,deltaX:0,deltaY:240,modifiers:0,pointerType:'mouse'
+      });
+      await wait(210);
+      const candidate=await screenshot(tabId);
+      if(imageDifference(last,candidate)>.005){next=candidate;break;}
+    }
+    if(!next){
+      // Never fabricate eight visually distinct scenes from a frozen canvas.
+      break;
+    }
+    frames.push(next);last=next;
+    setStatus('Recording real animation states: '+frames.length+'/'+count);
+  }
+  if(frames.length<2)throw Error('The rendered scene did not visibly advance. Try Manual interactions → MP4 or use the website’s navigation to start its presentation.');
+  const maxWidth=1200;
+  const scale=Math.min(1,maxWidth/width,Math.sqrt(MAX_PIXELS/(width*(height+36)*frames.length)));
+  const outWidth=Math.max(200,Math.floor(width*scale));
+  const imageHeight=Math.max(100,Math.floor(height*scale));
+  const heading=38,gutter=12;
+  const canvas=document.createElement('canvas');
+  canvas.width=outWidth;canvas.height=frames.length*(imageHeight+heading+gutter)+gutter;
+  const ctx=canvas.getContext('2d',{alpha:false});
+  if(!ctx)throw Error('The scene-sequence canvas is unavailable.');
+  ctx.fillStyle='#141414';ctx.fillRect(0,0,canvas.width,canvas.height);
+  for(let i=0;i<frames.length;i++){
+    const row=gutter+i*(imageHeight+heading+gutter);
+    ctx.fillStyle='#f4f4f1';ctx.fillRect(0,row,canvas.width,heading);
+    ctx.fillStyle='#181818';ctx.font='600 15px Arial, sans-serif';
+    ctx.fillText('SCENE '+String(i+1).padStart(2,'0')+' / '+String(frames.length).padStart(2,'0')+'   •   '+hostname,12,row+24);
+    ctx.drawImage(frames[i],0,0,frames[i].width,frames[i].height,0,row+heading,outWidth,imageHeight);
+  }
+  const mime=format==='png'?'image/png':'image/jpeg';
+  const blob=await new Promise((resolve,reject)=>canvas.toBlob(result=>result?resolve(result):reject(Error('Could not encode scene sheet.')),mime,.9));
+  await saveCaptureBlob(blob,hostname,'animation-scene-sequence',format==='png'?'png':'jpg');
+  setStatus('Saved '+frames.length+' distinct scene states as one labelled '+(format==='png'?'PNG':'JPG')+'. For continuous scroll motion, use Guided → Natural wheel → MP4.',false,true);
+  return frames.length;
+}
+
+/** Hide only small, repeated, fixed/sticky UI chrome after its first screenshot.
+ * Never hide large pinned panels that are part of the visual work itself.
+ */
+async function setRepeatedChromeVisible(tabId,visible){
+  const statement=visible
+    ?`(() => {for(const el of document.querySelectorAll('[data-bridge-repeat-chrome]')){
+       el.style.visibility=el.getAttribute('data-bridge-repeat-chrome');
+       el.removeAttribute('data-bridge-repeat-chrome');
+     }return true;})()`
+    :`(() => {for(const el of document.querySelectorAll('header,nav,[role="banner"]')){
+       const rect=el.getBoundingClientRect(),style=getComputedStyle(el);
+       if(rect.height>0&&rect.height<innerHeight*.18&&rect.width>innerWidth*.35
+          &&(style.position==='fixed'||style.position==='sticky')
+          &&!el.hasAttribute('data-bridge-repeat-chrome')){
+         el.setAttribute('data-bridge-repeat-chrome',el.style.visibility||'');
+         el.style.visibility='hidden';
+       }
+     }return true;})()`;
+  await evaluate(tabId,statement);
+}
+
 async function capture(format) {
   if (running) return;
   running = true;
@@ -146,6 +271,11 @@ async function capture(format) {
     // Keep Chromium treating the recorded page as focused while a popup is open.
     try{await chrome.debugger.sendCommand({tabId},'Emulation.setFocusEmulationEnabled',{enabled:true});}catch{}
     saved = await evaluate(tabId,dimensionsScript);
+    const initialModel=await evaluate(tabId,scrollModelScript);
+    if(initialModel?.virtual){
+      await captureSceneSheet(tabId,hostname,format,saved);
+      return;
+    }
     await waitForIntro(tabId);
     const metrics = await primePage(tabId);
     const scale=Math.min(1,Math.sqrt(MAX_PIXELS/Math.max(1,metrics.width*metrics.height)),30000/metrics.height);
@@ -165,6 +295,9 @@ async function capture(format) {
       const actual=await evaluate(tabId,scrollExpression(target));
       const y=Math.max(0,Number(actual)||0);
       if(target>0 && y<target*.7)throw new Error('The website blocked scripted scrolling; full-page capture would repeat the same viewport.');
+      if(i===1)await setRepeatedChromeVisible(tabId,false);
+      // Wait for scroll-triggered transitions and smooth-scroller interpolation.
+      await wait(440);
       const tile=await screenshot(tabId);
       // Paint at its real scroll offset. The last tile overlaps rather than cropping the footer.
       ctx.drawImage(tile,0,0,tile.width,tile.height,0,y*scale,metrics.viewportWidth*scale,metrics.viewportHeight*scale);
@@ -189,6 +322,7 @@ async function capture(format) {
     setStatus('Export failed: '+(error?.message||String(error)));
   } finally {
     if(attached) {
+      if(tabId)try{await setRepeatedChromeVisible(tabId,true);}catch{}
       if(saved && tabId) {
         try {await evaluate(tabId,scrollExpression(saved.scrollY||saved.nestedY||0));} catch {}
       }
