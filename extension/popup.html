@@ -1,24 +1,37 @@
 <!doctype html>
-<html lang="en">
-<head>
-<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Figma Bridge — Capture</title>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Figma Bridge — Capture</title>
 <style>
 :root{color-scheme:light;font-family:system-ui,-apple-system,Arial,sans-serif}
-body{width:344px;padding:19px;margin:0;background:#f7f6f3;color:#171713;box-sizing:border-box}
-h1{font-size:21px;font-weight:650;letter-spacing:-.5px;margin:0 0 6px}p{font-size:12px;line-height:1.5;color:#585954}
-.actions{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:20px 0 11px}
-button{border:1px solid #1b1b19;background:#1b1b19;color:white;border-radius:7px;padding:12px 10px;font:inherit;font-size:13px;font-weight:600;cursor:pointer}
+*{box-sizing:border-box}body{width:354px;padding:18px;margin:0;background:#f7f6f3;color:#171713}
+h1{font-size:21px;font-weight:650;letter-spacing:-.5px;margin:0 0 6px}h2{font-size:14px;margin:0 0 8px}
+p{font-size:12px;line-height:1.5;color:#585954}
+.section{border-top:1px solid #dddcd7;padding-top:14px;margin-top:16px}
+.actions{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:10px 0}
+button{border:1px solid #1b1b19;background:#1b1b19;color:white;border-radius:7px;padding:11px 10px;font:inherit;font-size:12px;font-weight:600;cursor:pointer}
 button.secondary{background:white;color:#171713}button:disabled{opacity:.45;cursor:wait}
-#status{border-top:1px solid #d8d8d2;padding-top:12px;min-height:34px;overflow-wrap:break-word}
+.form{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px}label{font-size:11px;font-weight:600;display:block;margin-bottom:4px}
+select{width:100%;height:37px;background:#fff;border:1px solid #c9c9c3;border-radius:6px;color:#222;font-size:12px;padding:0 7px}
+.help{font-size:11px;color:#61625b;margin:8px 0 11px}
+#status{border-top:1px solid #d8d8d2;padding-top:12px;min-height:34px;overflow-wrap:break-word;font-size:12px}
 a{color:inherit}small{color:#6d6e67;font-size:11px;display:block;line-height:1.4;margin-top:10px}
-</style>
-</head>
-<body>
+#stopRecord{display:none;width:100%;background:#a83624;border-color:#a83624}
+</style></head><body>
 <h1>Figma Bridge</h1>
-<p>Capture the <strong>actual rendered page</strong>, including GSAP, Canvas and WebGL, as one full-height image.</p>
+<p>Capture the real rendered website — static frames or scroll-driven animations.</p>
+<section class="section" aria-label="Still image export"><h2>Full-page image</h2>
 <div class="actions"><button data-format="png">Export PNG</button><button class="secondary" data-format="jpeg">Export JPG</button></div>
-<p id="status" role="status" aria-live="polite">Open the page you want to export and choose a format.</p>
-<small>Runs locally in Chrome. Captures scroll-driven states section by section. A debugger permission is required while capturing, then released. Large pages may take longer. <a href="https://bridge.neustackstudio.com/">Open Bridge</a></small>
+</section>
+<section class="section" aria-label="Motion capture"><h2>Animation recording</h2>
+<div class="form">
+<div><label for="motionMode">Workflow</label><select id="motionMode"><option value="guided">Guided full-page scroll</option><option value="fixed">Fixed viewport / loop</option><option value="manual">Manual interactions</option></select></div>
+<div><label for="motionFormat">Export</label><select id="motionFormat"><option value="mp4">MP4 · H.264</option><option value="gif">Animated GIF</option></select></div>
+<div><label for="motionDuration">Duration</label><select id="motionDuration"><option value="10">10 seconds</option><option value="20" selected>20 seconds</option><option value="30">30 seconds</option><option value="45">45 seconds</option><option value="60">60 seconds</option></select></div>
+<div><label for="motionQuality">Resolution</label><select id="motionQuality"><option value="720">720p · recommended</option><option value="1080">1080p · MP4 only</option></select></div>
+</div>
+<div id="motionHelp" class="help">Scrolls through the site and records each animation in motion. Keep the target tab visible.</div>
+<button id="startRecord" style="width:100%">Record animation</button><button id="stopRecord">Stop and export</button>
+</section>
+<p id="status" role="status" aria-live="polite">Open the page you want to capture.</p>
+<small>On-device capture, no upload. JPG/PNG uses Chrome's screenshot renderer. MP4/GIF records the current viewport over time. Animation recording requires Chrome 116+ and may use significant memory for longer or high-resolution recordings. <a href="https://bridge.neustackstudio.com/">Open Bridge</a></small>
 <script src="popup.js"></script>
 </body></html>
