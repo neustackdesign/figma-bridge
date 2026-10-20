@@ -1,0 +1,47 @@
+name: Bridge motion recording validation
+on:
+  push:
+    paths:
+      - extension/**
+      - package.json
+      - tests/motion-capture.test.mjs
+      - .github/workflows/motion-capture.yml
+  pull_request:
+    paths:
+      - extension/**
+      - package.json
+      - tests/motion-capture.test.mjs
+      - .github/workflows/motion-capture.yml
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Install pinned encoder and bundler dependencies
+        run: npm install --no-audit --no-fund --no-package-lock
+      - name: Produce offline-compatible bundled encoder
+        run: npm run build:extension
+      - name: Run recording regressions
+        run: node tests/motion-capture.test.mjs
+      - name: Validate bundled script exists
+        run: test -s extension/recorder.js
+      - name: Package installable Chrome extension
+        run: |
+          mkdir -p dist/extension
+          cp extension/manifest.json extension/popup.html extension/popup.js extension/background.js extension/record.html extension/recorder.js extension/README.md dist/extension/
+          cd dist
+          zip -qr bridge-capture-extension.zip extension
+      - name: Attach unpacked extension ZIP for installation
+        uses: actions/upload-artifact@v4
+        with:
+          name: figma-bridge-capture-extension
+          path: dist/bridge-capture-extension.zip
+          if-no-files-found: error
+          retention-days: 30
