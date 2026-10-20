@@ -32,16 +32,17 @@ jobs:
         run: node tests/motion-capture.test.mjs
       - name: Validate bundled script exists
         run: test -s extension/recorder.js
-      - name: Package installable Chrome extension
+      - name: Package Chrome extension and updated Figma companion
         run: |
-          mkdir -p dist/extension
+          mkdir -p dist/extension dist/figma-plugin
           cp extension/manifest.json extension/popup.html extension/popup.js extension/background.js extension/record.html extension/recorder.js extension/README.md dist/extension/
+          cp plugin/manifest.json plugin/code.js plugin/ui.html dist/figma-plugin/
           cd dist
-          zip -qr bridge-capture-extension.zip extension
-      - name: Attach unpacked extension ZIP for installation
+          zip -qr figma-bridge-complete-toolkit.zip extension figma-plugin
+      - name: Attach installable Bridge toolkit
         uses: actions/upload-artifact@v4
         with:
-          name: figma-bridge-capture-extension
-          path: dist/bridge-capture-extension.zip
+          name: figma-bridge-complete-toolkit
+          path: dist/figma-bridge-complete-toolkit.zip
           if-no-files-found: error
           retention-days: 30
