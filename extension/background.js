@@ -219,6 +219,8 @@ chrome.runtime.onMessage.addListener((message,sender,sendResponse)=>{
       case 'record-error':
         if(sender.url!==chrome.runtime.getURL(OFFSCREEN))return{ok:false};
         state.error=message.error||'Recording failed';await finishCapture();return{ok:true};
+      case 'record-heartbeat':
+        return sender.url===chrome.runtime.getURL(OFFSCREEN)?{ok:true}:{ok:false};
       case 'record-progress':
         if(sender.url!==chrome.runtime.getURL(OFFSCREEN))return{ok:false};
         if(message.phase==='encoding'){state.phase='saving';await notify();}
