@@ -356,7 +356,17 @@ async function exportSelection() {
 }
 
 figma.ui.onmessage = async (message) => {
-  if (!message || message.type !== 'export-html') return;
+  if (!message) return;
+  if (message.type === 'open-external') {
+    const allowed = new Set([
+      'https://bridge.neustackstudio.com/',
+      'https://github.com/neustackdesign/figma-bridge/actions/workflows/motion-capture.yml',
+      'https://github.com/neustackdesign/figma-bridge/tree/main/extension'
+    ]);
+    if (allowed.has(message.url) && typeof figma.openExternal === 'function') figma.openExternal(message.url);
+    return;
+  }
+  if (message.type !== 'export-html') return;
   try {
     figma.ui.postMessage({ type: 'status', message: 'Reading selected layers…' });
     const result = await exportSelection();

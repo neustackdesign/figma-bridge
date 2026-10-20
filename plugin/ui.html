@@ -81,6 +81,12 @@ function showTab(tab){
 }
 document.querySelectorAll('nav [data-tab]').forEach(item=>item.addEventListener('click',()=>showTab(item.dataset.tab)));
 document.getElementById('overviewExport').addEventListener('click',()=>showTab('export'));
+document.querySelectorAll('a[href^="https://"]').forEach(link=>{
+ link.addEventListener('click',event=>{
+  event.preventDefault();
+  parent.postMessage({pluginMessage:{type:'open-external',url:link.href}},'*');
+ });
+});
 button.onclick=()=>{button.disabled=true;setStatus('Exporting…');parent.postMessage({pluginMessage:{type:'export-html'}},'*')};
 onmessage=event=>{
  const msg=event.data.pluginMessage;if(!msg)return;
