@@ -186,7 +186,6 @@ $('#htmlInput').addEventListener('change',e=>readMarkupFile(e.target.files[0],$(
 $('#renderPaste').addEventListener('click',()=>{const text=$('#pasteInput').value.trim();if(!text)return setStatus('Paste HTML or SVG first.',true);containsExecutableScript(text)?renderScriptedMarkup(text,$('#pasteBase').value.trim(),'Pasted design'):renderStaticMarkup(text,$('#pasteBase').value.trim(),'Pasted design')});
 $('#loadUrl').addEventListener('click',async()=>{const url=$('#urlInput').value.trim();if(!url)return setStatus('Enter a URL first.',true);measure('bridge_url_fetch_start',{source:'url'});setStatus('Fetching page HTML…');try{const r=await fetch('/api/proxy?mode=html&url='+encodeURIComponent(url)),data=await r.json();if(!r.ok)throw new Error(data.error||'Could not fetch page');await renderStaticMarkup(data.html,data.finalUrl||url,new URL(data.finalUrl||url).hostname,'url')}catch(err){setStatus(err.message||String(err),true);measure('bridge_url_fetch_error',{source:'url'})}});
 async function captureLivePage(){
-  // Executed inside the *source* site from the copied bookmarklet.
   const sleep=ms=>new Promise(resolve=>setTimeout(resolve,ms));
   const getHeight=()=>Math.ceil(Math.max(document.documentElement.scrollHeight,document.body?.scrollHeight||0,innerHeight));
   const savedX=scrollX,savedY=scrollY;
@@ -261,8 +260,34 @@ async function captureLivePage(){
     const converter=mod.createFigmaConverter({layout:'auto',imageLoader});
     const width=Math.ceil(Math.max(document.documentElement.scrollWidth,document.body?.scrollWidth||0,innerWidth));
     const result=await converter.convert({element:document.body,width,height:getHeight(),name:document.title||location.hostname});
-    await navigator.clipboard.write([result.toClipboardItem()]);
-    alert('Copied editable HTML elements to Figma. Paste in Figma. Animated Canvas/WebGL content requires the full-page image companion.');
+    // The sweep/conversion can exceed the browser's transient clipboard activation.
+    // Present a real user-gesture copy action instead of relying on a stale bookmarklet click.
+    const payload=result.toClipboardItem();
+    const panel=document.createElement('div');
+    panel.setAttribute('role','dialog');
+    panel.setAttribute('aria-label','Figma Bridge capture ready');
+    Object.assign(panel.style,{position:'fixed',right:'20px',bottom:'20px',zIndex:'2147483647',background:'#171713',color:'#fff',padding:'18px',borderRadius:'9px',fontFamily:'system-ui,sans-serif',fontSize:'13px',lineHeight:'1.5',boxShadow:'0 8px 35px #0006',maxWidth:'300px'});
+    const label=document.createElement('div');
+    label.textContent='Figma Bridge: '+width+' × '+getHeight()+'px captured as editable layers where possible.';
+    label.style.marginBottom='12px';
+    const copy=document.createElement('button');
+    copy.textContent='Copy to Figma';
+    Object.assign(copy.style,{cursor:'pointer',padding:'10px 14px',border:'0',borderRadius:'5px',background:'#fff',color:'#171713',fontWeight:'600'});
+    copy.addEventListener('click',async()=>{
+      try{
+        await navigator.clipboard.write([payload]);
+        label.textContent='Copied. Switch to Figma and paste.';
+        copy.textContent='Close';
+        copy.onclick=()=>panel.remove();
+      }catch(err){label.textContent='Clipboard blocked: '+(err?.message||String(err));}
+    },{once:true});
+    const close=document.createElement('button');
+    close.textContent='×';
+    close.setAttribute('aria-label','Close');
+    Object.assign(close.style,{background:'transparent',border:0,color:'#fff',fontSize:'19px',float:'right',cursor:'pointer',marginLeft:'12px'});
+    close.addEventListener('click',()=>panel.remove());
+    panel.append(close,label,copy);
+    document.body.append(panel);
   }catch(error){
     alert('Figma Bridge live capture failed: '+(error?.message||String(error))+'\nFor GSAP, Canvas or WebGL-heavy pages, use Bridge Full-page Capture (PNG/JPG).');
   }finally{
@@ -276,7 +301,7 @@ async function captureLivePage(){
     window.ScrollTrigger?.update?.();
   }
 }
-const bookmarklet='javascript:('+captureLivePage.toString()+')()';
+const bookmarklet='javascript:('+captureLivePage.toString().replace(/\s*\n\s*/g,' ')+')()';
 $('#copyBookmarklet').addEventListener('click',async()=>{try{await navigator.clipboard.writeText(bookmarklet);setStatus('Bookmarklet copied. Create a browser bookmark and paste it into the bookmark URL field.');measure('bridge_bookmarklet_copied',{source:'web'})}catch{setStatus('Clipboard blocked. Copy the bookmarklet from DevTools.',true);measure('bridge_clipboard_error',{source:'bookmarklet'})}});
 let legacyPdfJsPromise=null;
 function loadLegacyPdfJs(){
