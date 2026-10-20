@@ -1,9 +1,20 @@
 {
   "name": "figma-bridge",
-  "version": "0.1.0",
+  "version": "0.3.0",
   "private": true,
   "type": "module",
   "engines": {
     "node": ">=20"
+  },
+  "scripts": {
+    "build:extension": "esbuild extension/recorder.source.js --bundle --format=iife --target=chrome116 --outfile=extension/recorder.js --minify",
+    "test:motion": "node tests/motion-capture.test.mjs"
+  },
+  "dependencies": {
+    "gifenc": "1.0.3",
+    "mp4-muxer": "5.2.2"
+  },
+  "devDependencies": {
+    "esbuild": "0.25.12"
   }
 }
