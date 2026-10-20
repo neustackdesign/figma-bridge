@@ -16,8 +16,10 @@ assert.match(inline[1],/captureLivePage\.toString\(\)\.replace/,'bookmarklet sho
 assert.match(inline[1],/navigator\.clipboard\.write\(\[payload\]\)/,'bookmarklet must use a fresh click for the clipboard');
 assert.match(index,/Full-page PNG \/ JPG/,'export discovery missing');
 
-const source=await fs.readFile('extension/popup.js','utf8');
-new vm.Script(source,{filename:'extension/popup.js'});
+const fullSource=await fs.readFile('extension/popup.js','utf8');
+new vm.Script(fullSource,{filename:'extension/popup.js'});
+// Screenshot fixture supplies only the original screenshot UI mocks; motion gets its own suite.
+const source=fullSource.split('/* Motion recording is independent of full-page still-image capture. */')[0];
 
 async function scenario({format='png',screenshotError=false}={}){
   const captured={scrolls:[],draws:[],download:null,attached:0,detached:0,screenshotCount:0,status:''};
