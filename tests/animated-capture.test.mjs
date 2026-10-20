@@ -14,7 +14,7 @@ assert.ok(inline,'browser app script not found');
 new vm.Script(inline[1],{filename:'index.html inline'});
 assert.match(inline[1],/captureLivePage\.toString\(\)\.replace/,'bookmarklet should be derived from live capture function');
 assert.match(inline[1],/navigator\.clipboard\.write\(\[payload\]\)/,'bookmarklet must use a fresh click for the clipboard');
-assert.match(index,/Full-page PNG \/ JPG/,'export discovery missing');
+assert.match(index,/(PNG · JPG · MP4 · GIF|Full-page PNG \/ JPG)/,'capture suite discovery missing');
 
 const fullSource=await fs.readFile('extension/popup.js','utf8');
 new vm.Script(fullSource,{filename:'extension/popup.js'});
