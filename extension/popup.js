@@ -11,10 +11,13 @@ async function evaluate(tabId, expression, timeoutMs = 15000) {
   const work = chrome.debugger.sendCommand({ tabId }, 'Runtime.evaluate', {
     expression, returnByValue: true, awaitPromise: true
   });
-  const timer = new Promise((_, reject) =>
-    setTimeout(() => reject(new Error('Page did not respond within the capture timeout.')), timeoutMs)
-  );
-  const response = await Promise.race([work, timer]);
+  let timeoutId;
+  const timeout = new Promise((_, reject) => {
+    timeoutId = setTimeout(() => reject(new Error('Page did not respond within the capture timeout.')), timeoutMs);
+  });
+  let response;
+  try { response = await Promise.race([work, timeout]); }
+  finally { clearTimeout(timeoutId); }
   if (response.exceptionDetails) {
     throw new Error(response.exceptionDetails.text || 'Page evaluation failed.');
   }
@@ -137,7 +140,7 @@ async function capture(format) {
     const url=URL.createObjectURL(blob);
     const filename=`figma-bridge/${hostname}-full-page-${new Date().toISOString().slice(0,10)}.${format==='png'?'png':'jpg'}`;
     try {
-      await chrome.downloads.download({url,filename,saveAs:true,conflictAction:'uniquify'});
+      await chrome.downloads.download({url,filename,saveAs:false,conflictAction:'uniquify'});
     } finally {
       setTimeout(()=>URL.revokeObjectURL(url),60000);
     }
