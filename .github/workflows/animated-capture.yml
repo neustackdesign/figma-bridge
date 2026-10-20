@@ -5,12 +5,14 @@ on:
       - index.html
       - extension/**
       - tests/animated-capture.test.mjs
+      - tests/smart-scene-capture.test.mjs
       - .github/workflows/animated-capture.yml
   pull_request:
     paths:
       - index.html
       - extension/**
       - tests/animated-capture.test.mjs
+      - tests/smart-scene-capture.test.mjs
       - .github/workflows/animated-capture.yml
   workflow_dispatch:
 permissions:
@@ -25,4 +27,6 @@ jobs:
         with:
           node-version: '22'
       - name: Validate page script, bookmarklet, extension, PNG and JPEG
-        run: node tests/animated-capture.test.mjs
+        run: |
+          node tests/animated-capture.test.mjs
+          node tests/smart-scene-capture.test.mjs
