@@ -1,20 +1,97 @@
 <!doctype html>
-<html>
-<head>
-<meta charset="utf-8" />
+<html lang="en"><head><meta charset="utf-8"/><meta name="viewport" content="width=device-width,initial-scale=1">
 <style>
-:root{--canvas:#eeebe5;--white:#fff;--ink:#1a1a1a;--ink-2:#3a3833;--muted:#6e6a62;--border:#e2dfd8;--border-strong:#d6d3cc;--hairline:#eeece7;--accent:#c8401a;--accent-ink:#9e3013;--accent-wash:#fff7f3;--danger:#a5340f;--serif:ui-serif,Georgia,"Times New Roman",serif;--sans:Inter,system-ui,-apple-system,"Segoe UI",sans-serif}
-*{box-sizing:border-box}body{margin:0;padding:0;font:12px/1.45 var(--sans);color:var(--ink);background:var(--canvas)}.top{padding:16px 16px 14px;background:var(--white);border-bottom:1px solid var(--border)}.eyebrow{font-size:9.5px;font-weight:700;letter-spacing:.09em;text-transform:uppercase;color:var(--muted);margin-bottom:5px}h1{font:400 24px/1 var(--serif);letter-spacing:-.01em;margin:0 0 7px}.lead{margin:0;color:var(--muted);font-size:11.5px;line-height:1.45}.body{padding:14px 16px 16px}.selection{background:var(--white);border:1px solid var(--border);border-radius:10px;padding:11px 12px;margin-bottom:10px;display:flex;align-items:center;justify-content:space-between;gap:12px}.selectionLabel{font-weight:600;color:var(--ink-2)}.count{font-variant-numeric:tabular-nums;color:var(--muted)}button{width:100%;height:36px;border:0;border-radius:8px;padding:0 12px;font:700 12px var(--sans);background:var(--accent);color:#fff;cursor:pointer}button:hover:not(:disabled){background:var(--accent-ink)}button:disabled{background:#c9c5bc;cursor:not-allowed}.status{min-height:34px;margin-top:10px;padding:9px 10px;border-radius:8px;background:rgba(255,255,255,.62);color:var(--muted);white-space:pre-wrap}.status.error{background:#fbe6e1;color:var(--danger)}.note{font-size:10.5px;color:var(--muted);margin-top:12px;padding-top:11px;border-top:1px solid var(--border);line-height:1.5}.note strong{color:var(--ink-2)}
-</style>
-</head>
+:root{--white:#fff;--ink:#191916;--muted:#6b6962;--line:#dedbd5;--canvas:#eeebe6;--accent:#c8401a;--wash:#fff5ef;--sans:Inter,system-ui,-apple-system,sans-serif;--serif:Georgia,serif}
+*{box-sizing:border-box}body{margin:0;color:var(--ink);background:var(--canvas);font:12px/1.47 var(--sans)}
+header{background:var(--white);padding:17px 18px 14px;border-bottom:1px solid var(--line)}
+.eyebrow{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.11em;color:var(--accent)}
+h1{font:400 29px/1.05 var(--serif);margin:4px 0 7px}
+.lead{margin:0;font-size:11.5px;color:var(--muted)}
+nav{display:flex;background:#fff;border-bottom:1px solid var(--line);gap:1px;padding:0 12px}
+nav button{border:0;background:transparent;color:var(--muted);font:600 11.5px var(--sans);cursor:pointer;border-bottom:2px solid transparent;padding:12px 9px}
+nav button[aria-selected=true]{color:var(--accent);border-color:var(--accent)}
+main{padding:15px 17px 18px}
+section[hidden]{display:none}
+.panel{background:#fff;border:1px solid var(--line);padding:13px;border-radius:10px;margin-bottom:11px}
+.panel h2{font-size:14px;line-height:1.25;margin:0 0 5px;letter-spacing:-.02em}
+.panel p{font-size:11.5px;color:var(--muted);margin:0 0 10px}
+.pill{display:inline-block;padding:2px 6px;border-radius:3px;background:#eeece7;color:#5b574e;font-size:9px;font-weight:700;letter-spacing:.03em;text-transform:uppercase;margin-bottom:8px}
+.actions{display:flex;gap:7px;flex-wrap:wrap}
+a.action,button.action{height:35px;display:inline-flex;align-items:center;justify-content:center;border:1px solid var(--ink);background:var(--ink);color:#fff;border-radius:6px;padding:0 12px;font:650 11px var(--sans);text-decoration:none;cursor:pointer;width:auto}
+a.secondary{background:#fff;color:var(--ink);border-color:var(--line)}
+button:disabled{opacity:.4;cursor:not-allowed}
+.row{display:flex;align-items:center;justify-content:space-between;gap:10px;margin:5px 0 11px}
+.row strong{font-size:12px}.count{color:var(--muted);font-variant-numeric:tabular-nums}
+.status{padding:9px 10px;border-radius:6px;background:var(--wash);color:#7c3927;font-size:11px;margin-top:10px;white-space:pre-wrap}
+.status.error{background:#fce2dc;color:#921c10}
+.note{font-size:10.5px;line-height:1.55;color:var(--muted);margin-top:9px}
+.cap{display:flex;gap:8px;justify-content:space-between;align-items:baseline;margin:5px 0 9px;border-bottom:1px solid #f0ede9;padding-bottom:7px}
+.cap:last-child{border:0;margin-bottom:0;padding-bottom:0}.cap b{font-size:11.5px}.cap span{font-size:10px;color:var(--muted);text-align:right}
+footer{padding:0 18px 15px;color:var(--muted);font-size:10px;line-height:1.45}
+</style></head>
 <body>
-<div class="top"><div class="eyebrow">Figma Bridge</div><h1>Export HTML</h1><p class="lead">Turn selected Figma frames or layers into one self-contained browser file.</p></div>
-<div class="body"><div class="selection"><span class="selectionLabel">Current selection</span><span class="count" id="count">0 layers</span></div><button id="export" disabled>Export self-contained HTML</button><div class="status" id="status">Select a frame or layer to begin.</div><div class="note"><strong>Mapping:</strong> Auto Layout → CSS flex · text → editable HTML · vectors → inline SVG · image fills → embedded data URIs · complex unsupported layers → PNG fallback.</div></div>
+<header><div class="eyebrow">Neustack tools / Figma Bridge</div><h1>One bridge. Three workflows.</h1>
+<p class="lead">Move designs between Figma and the browser, or capture a website exactly as it moves.</p></header>
+<nav role="tablist" aria-label="Bridge workflows">
+<button id="nav-overview" data-tab="overview" role="tab" aria-selected="true">Overview</button>
+<button id="nav-import" data-tab="import" role="tab" aria-selected="false">Web → Figma</button>
+<button id="nav-capture" data-tab="capture" role="tab" aria-selected="false">Capture</button>
+<button id="nav-export" data-tab="export" role="tab" aria-selected="false">Figma → Web</button></nav>
+<main>
+<section id="panel-overview" role="tabpanel">
+<div class="panel"><div class="pill">Browser application</div><h2>Make browser layouts editable</h2>
+<p>Import HTML, SVG, PDF and websites into editable Figma layers when the underlying DOM supports it.</p>
+<div class="actions"><a class="action" href="https://bridge.neustackstudio.com/" target="_blank" rel="noopener noreferrer">Open browser app ↗</a></div></div>
+<div class="panel"><div class="pill">Chrome / Edge companion</div><h2>Capture static and moving websites</h2>
+<p>Full-page PNG/JPG screenshots; guided scroll, hero loops and manual interaction recordings as MP4/GIF.</p>
+<div class="actions"><a class="action" href="https://github.com/neustackdesign/figma-bridge/actions/workflows/motion-capture.yml" target="_blank" rel="noopener noreferrer">Get capture extension ↗</a></div></div>
+<div class="panel"><div class="pill">This Figma plugin</div><h2>Export editable frames to HTML</h2>
+<p>Select a Figma frame or layers, then export one self-contained HTML document.</p>
+<div class="actions"><button class="action" id="overviewExport" type="button">Open export ↗</button></div></div>
+</section>
+<section id="panel-import" role="tabpanel" hidden>
+<div class="panel"><div class="pill">Works in your browser</div><h2>Browser → Figma</h2>
+<div class="cap"><b>HTML / SVG</b><span>Editable layers</span></div>
+<div class="cap"><b>PDF</b><span>Editable where reconstructable</span></div>
+<div class="cap"><b>Public website</b><span>Server DOM / live bookmarklet</span></div>
+<div class="actions"><a class="action" href="https://bridge.neustackstudio.com/" target="_blank" rel="noopener noreferrer">Open Bridge importer ↗</a></div></div>
+<p class="note">This Figma plugin cannot read an arbitrary live browser tab. Import in the Bridge browser app, then paste into this Figma file. WebGL/Canvas pixels may need a raster image.</p>
+</section>
+<section id="panel-capture" role="tabpanel" hidden>
+<div class="panel"><div class="pill">Requires Chrome extension</div><h2>Still images</h2><div class="cap"><b>PNG</b><span>Full page, lossless</span></div><div class="cap"><b>JPG</b><span>Full page, compressed</span></div></div>
+<div class="panel"><h2>Motion capture</h2><div class="cap"><b>Guided scroll</b><span>GSAP/ScrollTrigger → MP4/GIF</span></div><div class="cap"><b>Fixed viewport</b><span>Hero loops / backgrounds</span></div><div class="cap"><b>Manual recording</b><span>Hover / click / drag / scroll</span></div>
+<div class="actions"><a class="action" href="https://github.com/neustackdesign/figma-bridge/actions/workflows/motion-capture.yml" target="_blank" rel="noopener noreferrer">Install capture companion ↗</a><a class="action secondary" href="https://github.com/neustackdesign/figma-bridge/tree/main/extension" target="_blank" rel="noopener noreferrer">Instructions ↗</a></div></div>
+<p class="note">Figma's sandbox cannot access another tab's rendered frames or screen recording stream. The browser extension performs capture; this plugin can still export native Figma layers.</p>
+</section>
+<section id="panel-export" role="tabpanel" hidden>
+<div class="panel"><div class="pill">Runs inside Figma</div><h2>Export self-contained HTML</h2>
+<p>Auto Layout → CSS flex · editable text · SVG vectors · embedded images · raster fallback for unsupported layers.</p>
+<div class="row"><strong>Current selection</strong><span id="count" class="count">0 layers</span></div>
+<button class="action" id="export" type="button" disabled>Export selected layers</button>
+<div class="status" id="status" aria-live="polite">Select a frame or layer to begin.</div></div>
+</section>
+</main>
+<footer>Bridge spans three runtimes, so capabilities appear here as one product, with each action in the environment that can perform it.</footer>
 <script>
-const button=document.getElementById('export');const status=document.getElementById('status');const count=document.getElementById('count');let selectionCount=0;
+const button=document.getElementById('export'),status=document.getElementById('status'),count=document.getElementById('count');let selectionCount=0;
 function setStatus(message,isError=false){status.textContent=message;status.className='status'+(isError?' error':'')}
+function showTab(tab){
+  document.querySelectorAll('nav [data-tab]').forEach(item=>item.setAttribute('aria-selected',String(item.dataset.tab===tab)));
+  document.querySelectorAll('main section[id^="panel-"]').forEach(item=>item.hidden=item.id!=='panel-'+tab);
+}
+document.querySelectorAll('nav [data-tab]').forEach(item=>item.addEventListener('click',()=>showTab(item.dataset.tab)));
+document.getElementById('overviewExport').addEventListener('click',()=>showTab('export'));
 button.onclick=()=>{button.disabled=true;setStatus('Exporting…');parent.postMessage({pluginMessage:{type:'export-html'}},'*')};
-onmessage=(event)=>{const msg=event.data.pluginMessage;if(!msg)return;if(msg.type==='selection'){selectionCount=msg.count||0;count.textContent=selectionCount+(selectionCount===1?' layer':' layers');button.disabled=selectionCount===0;setStatus(selectionCount===0?'Select a frame or layer to begin.':'Ready to export.')}if(msg.type==='status')setStatus(msg.message||'Working…');if(msg.type==='error'){button.disabled=selectionCount===0;setStatus(msg.message||'Export failed.',true)}if(msg.type==='exported'){const blob=new Blob([msg.html],{type:'text/html;charset=utf-8'});const url=URL.createObjectURL(blob);const a=document.createElement('a');a.href=url;a.download=msg.filename||'figma-export.html';document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),2000);button.disabled=selectionCount===0;setStatus(`Exported ${msg.count} ${msg.count===1?'layer':'layers'} as ${msg.filename}`)}};
+onmessage=event=>{
+ const msg=event.data.pluginMessage;if(!msg)return;
+ if(msg.type==='selection'){selectionCount=msg.count||0;count.textContent=selectionCount+(selectionCount===1?' layer':' layers');button.disabled=selectionCount===0;setStatus(selectionCount===0?'Select a frame or layer to begin.':'Ready to export.')}
+ if(msg.type==='status')setStatus(msg.message||'Working…');
+ if(msg.type==='error'){button.disabled=selectionCount===0;setStatus(msg.message||'Export failed.',true)}
+ if(msg.type==='exported'){
+   const blob=new Blob([msg.html],{type:'text/html;charset=utf-8'}),url=URL.createObjectURL(blob),a=document.createElement('a');
+   a.href=url;a.download=msg.filename||'figma-export.html';document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),2000);
+   button.disabled=selectionCount===0;setStatus('Exported '+msg.count+' '+(msg.count===1?'layer':'layers')+' as '+msg.filename);
+ }
+};
 </script>
-</body>
-</html>
+</body></html>
