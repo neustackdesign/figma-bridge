@@ -61,6 +61,38 @@ function scrollExpression(y) {
   })()`;
 }
 
+/** Allow full-screen animated introductions to finish before measuring a
+ * purported "full page". An intro often reports exactly one viewport in height
+ * until its GSAP/WebGL sequence completes.
+ */
+async function waitForIntro(tabId){
+  const probe=`(() => {
+    const d=document.documentElement,b=document.body||d;
+    return {
+      height:Math.max(d.scrollHeight,b.scrollHeight),
+      viewport:innerHeight,
+      gsap:window.ScrollTrigger?.getAll?.().length||0,
+      canvas:document.querySelectorAll('canvas').length,
+      age:performance.now()
+    };
+  })()`;
+  const first=await evaluate(tabId,probe);
+  if(!first||first.height>first.viewport*1.1||first.gsap<8||!first.canvas)return;
+  const started=Date.now();
+  while(Date.now()-started<13000){
+    setStatus('Waiting for fullscreen animated introduction to settle… '+Math.round((Date.now()-started)/1000)+'s');
+    await wait(650);
+    const current=await evaluate(tabId,probe);
+    if(current&&current.height>current.viewport*1.1)return;
+  }
+  // Still a single virtual viewport after the intro. This is not a legitimate
+  // multi-section full-page screenshot; provide a more accurate recovery path.
+  const current=await evaluate(tabId,probe);
+  if(current&&current.height<=current.viewport*1.1){
+    throw new Error('This site uses an animated fullscreen/virtual-scroll scene, not a normal full page. Use "Capture 8 scene frames" or Guided scroll → MP4 (Natural wheel) to preserve its visual states.');
+  }
+}
+
 async function primePage(tabId) {
   const initial = await evaluate(tabId, dimensionsScript);
   if (!initial || initial.height < 1 || initial.viewportHeight < 1) {
@@ -114,6 +146,7 @@ async function capture(format) {
     // Keep Chromium treating the recorded page as focused while a popup is open.
     try{await chrome.debugger.sendCommand({tabId},'Emulation.setFocusEmulationEnabled',{enabled:true});}catch{}
     saved = await evaluate(tabId,dimensionsScript);
+    await waitForIntro(tabId);
     const metrics = await primePage(tabId);
     const scale=Math.min(1,Math.sqrt(MAX_PIXELS/Math.max(1,metrics.width*metrics.height)),30000/metrics.height);
     if(scale<.2)throw Error('This extremely long page cannot fit into a reliable single image. Use 8 scene frames or Guided scroll → MP4.');
