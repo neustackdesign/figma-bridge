@@ -53,9 +53,11 @@ function scrollExpression(y) {
       .sort((a,b)=>b.scrollHeight-a.scrollHeight)[0];
     if(nested && scrollY<1)nested.scrollTop=y;
     window.ScrollTrigger?.update?.();
-    await new Promise(r=>requestAnimationFrame(()=>requestAnimationFrame(r)));
-    await new Promise(r=>setTimeout(r,260));
-    return Math.max(0,scrollY||0,nested?.scrollTop||0);
+    // Backgrounded pages can throttle requestAnimationFrame while the extension
+    // popup is open. Use a bounded wall-clock delay instead.
+    await new Promise(r=>setTimeout(r,360));
+    return Math.max(0,scrollY||0,nested?.scrollTop||0,window.lenis?.scroll||0,
+      window.ScrollSmoother?.get?.()?.scrollTop?.()||0);
   })()`;
 }
 
@@ -109,15 +111,17 @@ async function capture(format) {
     attached = true;
     await chrome.debugger.sendCommand({tabId},'Page.enable');
     await chrome.debugger.sendCommand({tabId},'Runtime.enable');
+    // Keep Chromium treating the recorded page as focused while a popup is open.
+    try{await chrome.debugger.sendCommand({tabId},'Emulation.setFocusEmulationEnabled',{enabled:true});}catch{}
     saved = await evaluate(tabId,dimensionsScript);
     const metrics = await primePage(tabId);
-    if(metrics.width * metrics.height > MAX_PIXELS) {
-      throw new Error(`Page is ${metrics.width} × ${metrics.height}px. The 80-megapixel safety limit prevents an out-of-memory export.`);
-    }
+    const scale=Math.min(1,Math.sqrt(MAX_PIXELS/Math.max(1,metrics.width*metrics.height)),30000/metrics.height);
+    if(scale<.2)throw Error('This extremely long page cannot fit into a reliable single image. Use 8 scene frames or Guided scroll → MP4.');
     const total = Math.ceil(metrics.height / metrics.viewportHeight);
-    if(total > MAX_TILES) throw new Error('Page exceeds the 150-tile safety limit.');
+    if(total > MAX_TILES) throw new Error('This page has over 150 viewport sections. Use Scene frames or Guided scroll → MP4 instead of one enormous image.');
     const canvas=document.createElement('canvas');
-    canvas.width=metrics.width;canvas.height=metrics.height;
+    canvas.width=Math.max(1,Math.floor(metrics.width*scale));
+    canvas.height=Math.max(1,Math.floor(metrics.height*scale));
     const ctx=canvas.getContext('2d',{alpha:format==='png'});
     if (!ctx) throw new Error('Could not initialise the image canvas.');
     if(format==='jpeg') {ctx.fillStyle='#fff';ctx.fillRect(0,0,canvas.width,canvas.height);}
@@ -130,7 +134,7 @@ async function capture(format) {
       if(target>0 && y<target*.7)throw new Error('The website blocked scripted scrolling; full-page capture would repeat the same viewport.');
       const tile=await screenshot(tabId);
       // Paint at its real scroll offset. The last tile overlaps rather than cropping the footer.
-      ctx.drawImage(tile,0,0,tile.width,tile.height,0,y,metrics.viewportWidth,metrics.viewportHeight);
+      ctx.drawImage(tile,0,0,tile.width,tile.height,0,y*scale,metrics.viewportWidth*scale,metrics.viewportHeight*scale);
       if(previousPosition===y && i>0 && maxScroll>0 && y<maxScroll-2) {
         throw new Error('The page did not advance while scrolling; its custom scroll container may be locked.');
       }
@@ -147,7 +151,7 @@ async function capture(format) {
     } finally {
       setTimeout(()=>URL.revokeObjectURL(url),60000);
     }
-    setStatus(`Export ready: ${metrics.width} × ${metrics.height}px ${format==='png'?'PNG':'JPG'}.`);
+    setStatus(`Export ready: ${canvas.width} × ${canvas.height}px ${format==='png'?'PNG':'JPG'}.`+(scale<1?' Auto-scaled to fit browser memory limits.':''),false,true);
   } catch(error) {
     setStatus('Export failed: '+(error?.message||String(error)));
   } finally {
@@ -155,6 +159,7 @@ async function capture(format) {
       if(saved && tabId) {
         try {await evaluate(tabId,scrollExpression(saved.scrollY||saved.nestedY||0));} catch {}
       }
+      try{await chrome.debugger.sendCommand({tabId},'Emulation.setFocusEmulationEnabled',{enabled:false});}catch{}
       try {await chrome.debugger.detach({tabId});} catch {}
     }
     running=false;
