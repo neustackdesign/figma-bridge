@@ -82,7 +82,7 @@
         <div class="pane" id="url">
           <div class="field" style="margin-top:0"><label for="urlInput">Public website URL</label><input id="urlInput" type="url" placeholder="https://example.com" /></div>
           <div class="railActions"><button class="btn" id="loadUrl">Load URL</button><button class="btn" id="copyBookmarklet">Copy live-page bookmarklet</button></div>
-          <p class="micro">Server HTML is fetched through Bridge. For JS-rendered states, run the bookmarklet on the live page.</p>
+          <p class="micro">Server HTML is fetched through Bridge. For JS-rendered states, run the bookmarklet on the live page. Use the image exporter for animated pixels.</p>
         </div>
 
         <div class="pane" id="pdf">
@@ -128,7 +128,16 @@
             <div class="cap"><span>Public URL</span><span class="ok">server HTML / live capture</span></div>
             <div class="cap"><span>PDF v1</span><span class="ok">vectors + editable text</span></div>
           </div>
-          <p class="micro">DOM → Figma is handled by <code>@figit/dom-to-figma</code>. Containers become native Auto Layout only when the measured browser geometry can be reproduced exactly.</p>
+          <p class="micro">DOM → Figma is handled by <code>@figit/dom-to-figma</code>. Containers become native Auto Layout only when measured geometry can be reproduced. For live GSAP and Canvas/WebGL sites, use the browser-native image capture route when DOM layers cannot preserve the actual pixels.</p>
+        </section>
+
+        <section class="section">
+          <span class="eyebrow">Browser-native capture</span>
+          <div class="inspectCard accent">
+            <div class="direction"><div class="directionMark">↓</div><div class="directionCopy"><div class="directionTitle">Full-page PNG / JPG</div><div class="directionMeta">GSAP · WebGL · Canvas · live sites</div></div></div>
+            <p class="micro">Use the companion Chrome extension on the actual site. It scrolls, renders and stitches the page into one image; editable Figma capture remains a separate output.</p>
+            <div class="inspectorActions"><a class="btn primary" href="https://github.com/neustackdesign/figma-bridge/tree/main/extension" target="_blank" rel="noreferrer">Get image exporter</a></div>
+          </div>
         </section>
 
         <section class="section">
@@ -176,7 +185,123 @@ async function readMarkupFile(file,baseUrl=''){if(!file)return;const text=await 
 $('#htmlInput').addEventListener('change',e=>readMarkupFile(e.target.files[0],$('#baseUrl').value.trim()));
 $('#renderPaste').addEventListener('click',()=>{const text=$('#pasteInput').value.trim();if(!text)return setStatus('Paste HTML or SVG first.',true);containsExecutableScript(text)?renderScriptedMarkup(text,$('#pasteBase').value.trim(),'Pasted design'):renderStaticMarkup(text,$('#pasteBase').value.trim(),'Pasted design')});
 $('#loadUrl').addEventListener('click',async()=>{const url=$('#urlInput').value.trim();if(!url)return setStatus('Enter a URL first.',true);measure('bridge_url_fetch_start',{source:'url'});setStatus('Fetching page HTML…');try{const r=await fetch('/api/proxy?mode=html&url='+encodeURIComponent(url)),data=await r.json();if(!r.ok)throw new Error(data.error||'Could not fetch page');await renderStaticMarkup(data.html,data.finalUrl||url,new URL(data.finalUrl||url).hostname,'url')}catch(err){setStatus(err.message||String(err),true);measure('bridge_url_fetch_error',{source:'url'})}});
-const bookmarklet=`javascript:(async()=>{try{const sleep=ms=>new Promise(r=>setTimeout(r,ms));const max=Math.max(0,document.documentElement.scrollHeight-innerHeight),step=Math.max(320,Math.floor(innerHeight*.72));for(let y=0;y<=max;y+=step){scrollTo(0,y);await sleep(50)}scrollTo(0,0);document.querySelectorAll('[data-reveal]').forEach(el=>{el.style.opacity='1';el.style.transform='none';el.style.visibility='visible'});const st=document.createElement('style');st.textContent='*,*::before,*::after{transition:none!important;animation-play-state:paused!important}';document.head.appendChild(st);await sleep(100);const m=await import('https://esm.sh/@figit/dom-to-figma@0.2.4?bundle');const c=m.createFigmaConverter({layout:'auto'});const r=await c.convert({element:document.body,width:Math.max(document.documentElement.scrollWidth,innerWidth),height:Math.max(document.documentElement.scrollHeight,innerHeight),name:document.title||location.hostname});await navigator.clipboard.write([r.toClipboardItem()]);alert('Copied to Figma clipboard — paste in Figma.')}catch(e){alert('Figma Bridge capture failed: '+e.message)}})();`;
+async function captureLivePage(){
+  const sleep=ms=>new Promise(resolve=>setTimeout(resolve,ms));
+  const getHeight=()=>Math.ceil(Math.max(document.documentElement.scrollHeight,document.body?.scrollHeight||0,innerHeight));
+  const savedX=scrollX,savedY=scrollY;
+  const overrides=[],pausedAnimations=[];
+  let captureStyle=null,tickerStopped=false;
+  const candidates=[...document.querySelectorAll('[data-reveal],[data-gsap],[data-animate],[data-animation],.reveal,[style*="opacity"]')].slice(0,1500);
+  const revealed=new Set();
+  try{
+    const scrollToPoint=async y=>{
+      const smoother=window.ScrollSmoother?.get?.();
+      if(smoother) smoother.scrollTop(y,false);
+      else{
+        window.lenis?.scrollTo?.(y,{immediate:true,force:true});
+        scrollTo({top:y,behavior:'instant'});
+      }
+      window.ScrollTrigger?.update?.();
+      await sleep(130);
+      for(const el of candidates){
+        if(!el.isConnected)continue;
+        const r=el.getBoundingClientRect(),s=getComputedStyle(el);
+        if(r.bottom>0&&r.top<innerHeight&&r.width>0&&r.height>0&&s.visibility!=='hidden'&&Number(s.opacity)>.8)revealed.add(el);
+      }
+    };
+    let y=0,steps=0;
+    while(y<getHeight()&&steps++<180){
+      await scrollToPoint(y);
+      y+=Math.max(300,Math.floor(innerHeight*.72));
+    }
+    await scrollToPoint(0);
+    await Promise.race([document.fonts?.ready||Promise.resolve(),sleep(3000)]);
+    await Promise.race([Promise.all([...document.images].map(img=>img.complete?Promise.resolve():new Promise(r=>{
+      img.addEventListener('load',r,{once:true});
+      img.addEventListener('error',r,{once:true});
+    }))),sleep(3500)]);
+    // Only reveal elements actually observed as visible while scrolling; avoid
+    // indiscriminately turning hidden menus, overlays and carousel slides on.
+    for(const el of revealed){
+      const style=getComputedStyle(el);
+      if(Number(style.opacity)>.05&&style.visibility!=='hidden')continue;
+      overrides.push([el,el.style.opacity,el.style.visibility,el.style.transform]);
+      el.style.opacity='1';
+      el.style.visibility='visible';
+      if(style.transform!=='none')el.style.transform='none';
+    }
+    for(const animation of document.getAnimations()){
+      if(animation.playState==='running'){
+        pausedAnimations.push(animation);
+        try{animation.pause()}catch{}
+      }
+    }
+    if(window.gsap?.ticker?.sleep){window.gsap.ticker.sleep();tickerStopped=true;}
+    captureStyle=document.createElement('style');
+    captureStyle.textContent='html{scroll-behavior:auto!important}*,*::before,*::after{transition-duration:0s!important;animation-play-state:paused!important;caret-color:transparent!important}';
+    document.head.appendChild(captureStyle);
+    await sleep(110);
+    const mod=await import('https://esm.sh/@figit/dom-to-figma@0.2.4?bundle');
+    const imageLoader=async({src})=>{
+      const source=new URL(src,location.href).href;
+      try{
+        const response=await fetch(source,{mode:'cors',credentials:'omit'});
+        if(!response.ok)throw Error('Asset fetch failed');
+        const blob=await response.blob();
+        return {bytes:await blob.arrayBuffer(),mimeType:blob.type||'image/png'};
+      }catch{
+        const proxy='https://bridge.neustackstudio.com/api/proxy?mode=asset&url='+encodeURIComponent(source);
+        const response=await fetch(proxy,{mode:'cors',credentials:'omit'});
+        if(!response.ok)throw Error('Image proxy could not retrieve '+source);
+        const blob=await response.blob();
+        return {bytes:await blob.arrayBuffer(),mimeType:blob.type||'image/png'};
+      }
+    };
+    const converter=mod.createFigmaConverter({layout:'auto',imageLoader});
+    const width=Math.ceil(Math.max(document.documentElement.scrollWidth,document.body?.scrollWidth||0,innerWidth));
+    const result=await converter.convert({element:document.body,width,height:getHeight(),name:document.title||location.hostname});
+    // The sweep/conversion can exceed the browser's transient clipboard activation.
+    // Present a real user-gesture copy action instead of relying on a stale bookmarklet click.
+    const payload=result.toClipboardItem();
+    const panel=document.createElement('div');
+    panel.setAttribute('role','dialog');
+    panel.setAttribute('aria-label','Figma Bridge capture ready');
+    Object.assign(panel.style,{position:'fixed',right:'20px',bottom:'20px',zIndex:'2147483647',background:'#171713',color:'#fff',padding:'18px',borderRadius:'9px',fontFamily:'system-ui,sans-serif',fontSize:'13px',lineHeight:'1.5',boxShadow:'0 8px 35px #0006',maxWidth:'300px'});
+    const label=document.createElement('div');
+    label.textContent='Figma Bridge: '+width+' × '+getHeight()+'px captured as editable layers where possible.';
+    label.style.marginBottom='12px';
+    const copy=document.createElement('button');
+    copy.textContent='Copy to Figma';
+    Object.assign(copy.style,{cursor:'pointer',padding:'10px 14px',border:'0',borderRadius:'5px',background:'#fff',color:'#171713',fontWeight:'600'});
+    copy.addEventListener('click',async()=>{
+      try{
+        await navigator.clipboard.write([payload]);
+        label.textContent='Copied. Switch to Figma and paste.';
+        copy.textContent='Close';
+        copy.onclick=()=>panel.remove();
+      }catch(err){label.textContent='Clipboard blocked: '+(err?.message||String(err));}
+    },{once:true});
+    const close=document.createElement('button');
+    close.textContent='×';
+    close.setAttribute('aria-label','Close');
+    Object.assign(close.style,{background:'transparent',border:0,color:'#fff',fontSize:'19px',float:'right',cursor:'pointer',marginLeft:'12px'});
+    close.addEventListener('click',()=>panel.remove());
+    panel.append(close,label,copy);
+    document.body.append(panel);
+  }catch(error){
+    alert('Figma Bridge live capture failed: '+(error?.message||String(error))+'\nFor GSAP, Canvas or WebGL-heavy pages, use Bridge Full-page Capture (PNG/JPG).');
+  }finally{
+    captureStyle?.remove();
+    overrides.forEach(([el,opacity,visibility,transform])=>{
+      el.style.opacity=opacity;el.style.visibility=visibility;el.style.transform=transform;
+    });
+    pausedAnimations.forEach(animation=>{try{animation.play()}catch{}});
+    if(tickerStopped)try{window.gsap.ticker.wake()}catch{}
+    scrollTo(savedX,savedY);
+    window.ScrollTrigger?.update?.();
+  }
+}
+const bookmarklet='javascript:('+captureLivePage.toString().replace(/^\s*\/\/.*$/gm,'').replace(/\s*\n\s*/g,' ')+')()';
 $('#copyBookmarklet').addEventListener('click',async()=>{try{await navigator.clipboard.writeText(bookmarklet);setStatus('Bookmarklet copied. Create a browser bookmark and paste it into the bookmark URL field.');measure('bridge_bookmarklet_copied',{source:'web'})}catch{setStatus('Clipboard blocked. Copy the bookmarklet from DevTools.',true);measure('bridge_clipboard_error',{source:'bookmarklet'})}});
 let legacyPdfJsPromise=null;
 function loadLegacyPdfJs(){

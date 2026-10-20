@@ -1,0 +1,28 @@
+name: Bridge animated capture and export regression
+on:
+  push:
+    paths:
+      - index.html
+      - extension/**
+      - tests/animated-capture.test.mjs
+      - .github/workflows/animated-capture.yml
+  pull_request:
+    paths:
+      - index.html
+      - extension/**
+      - tests/animated-capture.test.mjs
+      - .github/workflows/animated-capture.yml
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  capture-regression:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Validate page script, bookmarklet, extension, PNG and JPEG
+        run: node tests/animated-capture.test.mjs

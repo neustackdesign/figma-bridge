@@ -1,0 +1,15 @@
+{
+  "manifest_version": 3,
+  "name": "Figma Bridge — Full-page Capture",
+  "version": "0.2.0",
+  "description": "Export complete, animated live websites to PNG or JPEG using browser-rendered screenshots.",
+  "permissions": [
+    "activeTab",
+    "debugger",
+    "downloads"
+  ],
+  "action": {
+    "default_title": "Capture full page with Figma Bridge",
+    "default_popup": "popup.html"
+  }
+}
