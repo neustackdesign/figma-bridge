@@ -162,3 +162,84 @@ async function capture(format) {
   }
 }
 buttons.forEach(button=>button.addEventListener('click',()=>capture(button.dataset.format)));
+
+/* Motion recording is independent of full-page still-image capture. */
+const motionFormat=document.getElementById('motionFormat');
+const motionQuality=document.getElementById('motionQuality');
+const motionDuration=document.getElementById('motionDuration');
+const motionMode=document.getElementById('motionMode');
+const motionHelp=document.getElementById('motionHelp');
+const startRecord=document.getElementById('startRecord');
+const stopRecord=document.getElementById('stopRecord');
+const descriptions={
+  guided:'Bridge automatically scrolls from the hero to the footer and records ScrollTrigger/GSAP transitions. Keep the site visible.',
+  fixed:'Record a fixed viewport while the page plays its animations or loop. Bridge will not scroll.',
+  manual:'Start recording, close the popup, and scroll, hover or click naturally. Reopen Bridge to stop early.'
+};
+function syncMotionOptions(){
+  const isGif=motionFormat.value==='gif';
+  for(const option of motionDuration.options)option.disabled=isGif&&Number(option.value)>30;
+  if(isGif&&Number(motionDuration.value)>30)motionDuration.value='20';
+  if(isGif)motionQuality.value='720';
+  motionQuality.disabled=isGif;
+  motionHelp.textContent=descriptions[motionMode.value]+(isGif?' GIF is capped at 560px, 8 fps and 30 seconds.':' MP4 uses H.264 at 24 fps.');
+}
+motionFormat.addEventListener('change',syncMotionOptions);
+motionMode.addEventListener('change',syncMotionOptions);
+syncMotionOptions();
+const setMotionUi=phase=>{
+  const active=phase==='recording'||phase==='starting'||phase==='saving';
+  startRecord.disabled=active;
+  stopRecord.style.display=phase==='recording'?'block':'none';
+  for(const control of [motionFormat,motionDuration,motionMode,motionQuality])control.disabled=active;
+};
+async function getMotionState(){
+  try{
+    const result=await chrome.runtime.sendMessage({target:'worker',type:'record-state'});
+    if(!result?.ok)return;
+    setMotionUi(result.phase);
+    if(result.phase==='recording'){
+      setStatus('Recording '+result.format?.toUpperCase()+' in the active tab. You can close this popup and return to the page.');
+    }else if(result.phase==='saving'){
+      setStatus('Encoding and saving recording…');
+    }else if(result.error){
+      setStatus('Previous recording: '+result.error,true);
+    }else if(result.filename){
+      setStatus('Last recording saved: '+result.filename,false,true);
+    }
+  }catch(error){setStatus('Motion recorder unavailable: '+error.message,true);}
+}
+startRecord.addEventListener('click',async()=>{
+  try{
+    startRecord.disabled=true;
+    setStatus('Starting the tab recorder…');
+    const [tab]=await chrome.tabs.query({active:true,currentWindow:true});
+    if(!tab?.id||!/^https?:\/\//i.test(tab.url||''))throw Error('Open an ordinary website before recording.');
+    const result=await chrome.runtime.sendMessage({
+      target:'worker',type:'record-start',tabId:tab.id,
+      mode:motionMode.value,format:motionFormat.value,
+      duration:Number(motionDuration.value),quality:Number(motionQuality.value)
+    });
+    if(!result?.ok)throw Error(result?.error||'Could not start recording.');
+    setMotionUi('recording');
+    setStatus('Recording. Return to the page; reopen Bridge to stop early.');
+    // Leave the tab interactive for manual motion/hover/click workflows.
+    window.setTimeout(()=>window.close(),500);
+  }catch(error){
+    setMotionUi('idle');
+    setStatus('Recording failed: '+(error?.message||String(error)),true);
+  }
+});
+stopRecord.addEventListener('click',async()=>{
+  setMotionUi('saving');
+  setStatus('Finishing recording…');
+  try{
+    const result=await chrome.runtime.sendMessage({target:'worker',type:'record-stop'});
+    if(!result?.ok)throw Error(result?.error||'Could not stop recording.');
+    setStatus('Encoding and downloading…');
+  }catch(error){
+    setStatus('Could not stop recording: '+(error.message||String(error)),true);
+    await getMotionState();
+  }
+});
+void getMotionState();
