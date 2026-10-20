@@ -19,7 +19,7 @@ assert.match(index,/(PNG · JPG · MP4 · GIF|Full-page PNG \/ JPG)/,'capture su
 const fullSource=await fs.readFile('extension/popup.js','utf8');
 new vm.Script(fullSource,{filename:'extension/popup.js'});
 // Screenshot fixture supplies only the original screenshot UI mocks; motion gets its own suite.
-const source=fullSource.split('/* Motion recording is independent of full-page still-image capture. */')[0];
+const source=fullSource.split('/* Lightweight on-page diagnostics: no page content or credentials are collected. */')[0];
 
 async function scenario({format='png',screenshotError=false}={}){
   const captured={scrolls:[],draws:[],download:null,attached:0,detached:0,screenshotCount:0,status:''};
