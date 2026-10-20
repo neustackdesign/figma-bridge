@@ -51,6 +51,17 @@ Auto Layout is inferred by `@figit/dom-to-figma` for flex, grid, wrapping and bl
 
 The browser conversion engine is the MIT-licensed [`@figit/dom-to-figma`](https://github.com/figitdesign/web-to-figma) package rather than a Neustack reimplementation.
 
+## Record scroll and animation journeys as MP4 or GIF
+
+The same local [browser companion](./extension/) now includes three video workflows: **Guided full-page scroll**, **Fixed viewport / loop**, and **Manual interactions**. It captures the actual Chrome tab video stream (including animations and Canvas/WebGL) and exports local H.264 MP4 or animated GIF.
+
+- MP4: up to 1080p, 24fps and 60 seconds, silent.
+- GIF: up to 560px, 8fps and 30 seconds.
+- Chrome 116+; no remote rendering server or billable infrastructure.
+- Use the [latest successful CI build](https://github.com/neustackdesign/figma-bridge/actions/workflows/motion-capture.yml) to install the packaged extension, or run `npm install && npm run build:extension` locally before loading `extension/`.
+
+This records the viewport moving through a site over time, not a static tall screenshot. Hover and click-triggered animations require Manual interactions mode. Chrome's tab capture and H.264 encoding support vary by browser/platform; the CI suite validates logic and bundling but is not a substitute for visual tests against a site.
+
 ## Full-page PNG / JPG from animated live websites
 
 Bridge also includes a browser-native [Chrome / Edge extension](./extension/) for full-height screenshots. Use this when you need the **actual rendered pixels** of GSAP/ScrollTrigger, smooth-scrolling, video, Canvas, WebGL or otherwise heavily animated websites.
@@ -60,7 +71,7 @@ Bridge also includes a browser-native [Chrome / Edge extension](./extension/) fo
 3. Visit the source website directly, then use the **Figma Bridge — Full-page Capture** toolbar action.
 4. Choose **Export PNG** or **Export JPG**. Chrome downloads one stitched, full-height image.
 
-The companion operates **locally**, uses the existing browser render output, has no server-side screenshot service, and releases its temporary debugger session after capture. It does not produce editable Figma layers. Scroll-driven pinned elements/sticky headers can repeat in a stitched static image; DRM video and arbitrary locked scrollers remain limitations.
+The companion operates **locally**, uses the existing browser render output, has no server-side screenshot service, and releases its temporary debugger session after still-image capture. It does not produce editable Figma layers. Scroll-driven pinned elements/sticky headers can repeat in a stitched static image; DRM video and arbitrary locked scrollers remain limitations.
 
 ### Live-page editable Figma import
 
