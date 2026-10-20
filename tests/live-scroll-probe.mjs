@@ -30,12 +30,12 @@ for(const [name,url] of urls){
   page.on('pageerror',error=>{if(record.errors.length<5)record.errors.push(error.message);});
   try{
     await page.goto(url,{waitUntil:'domcontentloaded',timeout:35000});
-    await page.waitForTimeout(2200);
+    await page.waitForTimeout(name==='heron'?10500:2200);
     record.before=await page.evaluate(metrics);
     await page.screenshot({path:path.join(out,name+'-top.png'),fullPage:false,timeout:12000});
     await page.mouse.move(700,500);
     for(let step=0;step<10;step++){await page.mouse.wheel(0,430);await page.waitForTimeout(240);}
-    await page.waitForTimeout(900);
+    await page.waitForTimeout(name==='heron'?1800:900);
     record.after=await page.evaluate(metrics);
     await page.screenshot({path:path.join(out,name+'-after-wheel.png'),fullPage:false,timeout:12000});
     record.visited=true;
