@@ -26,11 +26,15 @@ async function evaluate(tabId, expression, timeoutMs = 15000) {
 
 const dimensionsScript = `(() => {
   const d=document.documentElement, b=document.body||d;
+  const nested=[...document.querySelectorAll('main,[data-scroll-container],[data-lenis-root],[data-scroll],#app')]
+    .filter(el=>el.clientHeight>=innerHeight*.6 && el.clientWidth>=innerWidth*.6
+      && el.scrollHeight>el.clientHeight+100)
+    .sort((a,b)=>b.scrollHeight-a.scrollHeight)[0];
   return {
-    width:Math.ceil(Math.max(d.scrollWidth,b.scrollWidth,innerWidth,1)),
-    height:Math.ceil(Math.max(d.scrollHeight,b.scrollHeight,innerHeight,1)),
+    width:Math.ceil(Math.max(innerWidth,1)),
+    height:Math.ceil(Math.max(d.scrollHeight,b.scrollHeight,nested?.scrollHeight||0,innerHeight,1)),
     viewportHeight:innerHeight, viewportWidth:innerWidth,
-    scrollX:scrollX,scrollY:scrollY
+    scrollX:scrollX,scrollY:scrollY,nestedY:nested?.scrollTop||0
   };
 })()`;
 
@@ -42,17 +46,16 @@ function scrollExpression(y) {
     else {
       window.lenis?.scrollTo?.(y,{immediate:true,force:true});
       window.scrollTo({top:y,behavior:'instant'});
-      if(y>0 && scrollY<1) {
-        const candidate=[...document.querySelectorAll('main, [data-scroll-container], [data-lenis-root], [data-scroll], #app')]
-          .filter(el=>el.scrollHeight>el.clientHeight+100)
-          .sort((a,b)=>(b.scrollHeight-b.clientHeight)-(a.scrollHeight-a.clientHeight))[0];
-        if(candidate) candidate.scrollTop=y;
-      }
     }
+    const nested=[...document.querySelectorAll('main,[data-scroll-container],[data-lenis-root],[data-scroll],#app')]
+      .filter(el=>el.clientHeight>=innerHeight*.6 && el.clientWidth>=innerWidth*.6
+        && el.scrollHeight>el.clientHeight+100)
+      .sort((a,b)=>b.scrollHeight-a.scrollHeight)[0];
+    if(nested && scrollY<1)nested.scrollTop=y;
     window.ScrollTrigger?.update?.();
     await new Promise(r=>requestAnimationFrame(()=>requestAnimationFrame(r)));
     await new Promise(r=>setTimeout(r,260));
-    return Math.max(0,scrollY||0);
+    return Math.max(0,scrollY||0,nested?.scrollTop||0);
   })()`;
 }
 
@@ -122,9 +125,9 @@ async function capture(format) {
     let previousPosition=-1;
     for(let i=0;i<total;i++) {
       const target=Math.min(i*metrics.viewportHeight,maxScroll);
-      await evaluate(tabId,scrollExpression(target));
-      const actual=await evaluate(tabId,'Math.max(0,scrollY||0)');
-      const y=(actual<1 && target>0)?target:actual;
+      const actual=await evaluate(tabId,scrollExpression(target));
+      const y=Math.max(0,Number(actual)||0);
+      if(target>0 && y<target*.7)throw new Error('The website blocked scripted scrolling; full-page capture would repeat the same viewport.');
       const tile=await screenshot(tabId);
       // Paint at its real scroll offset. The last tile overlaps rather than cropping the footer.
       ctx.drawImage(tile,0,0,tile.width,tile.height,0,y,metrics.viewportWidth,metrics.viewportHeight);
@@ -150,7 +153,7 @@ async function capture(format) {
   } finally {
     if(attached) {
       if(saved && tabId) {
-        try {await evaluate(tabId,scrollExpression(saved.scrollY));} catch {}
+        try {await evaluate(tabId,scrollExpression(saved.scrollY||saved.nestedY||0));} catch {}
       }
       try {await chrome.debugger.detach({tabId});} catch {}
     }
