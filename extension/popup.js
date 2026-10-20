@@ -163,11 +163,77 @@ async function capture(format) {
 }
 buttons.forEach(button=>button.addEventListener('click',()=>capture(button.dataset.format)));
 
+/* A storyboard preserves distinct visual states instead of stitching them
+ * into one physically impossible image. Captures the active, rendered tab.
+ */
+const sceneFramesButton=document.getElementById('sceneFrames');
+async function captureSceneFrames(){
+  if(running)return;
+  running=true;buttons.forEach(button=>button.disabled=true);sceneFramesButton.disabled=true;
+  let attached=false,tabId,original;
+  const urls=[];
+  try{
+    const [tab]=await chrome.tabs.query({active:true,currentWindow:true});
+    if(!tab?.id||!/^https?:\/\//i.test(tab.url||''))throw Error('Open a website tab.');
+    tabId=tab.id;
+    const hostname=new URL(tab.url).hostname.replace(/[^a-z0-9.-]/gi,'-');
+    await chrome.debugger.attach({tabId},'1.3');attached=true;
+    await chrome.debugger.sendCommand({tabId},'Page.enable');
+    await chrome.debugger.sendCommand({tabId},'Runtime.enable');
+    original=await evaluate(tabId,dimensionsScript);
+    if(!original?.viewportWidth||!original?.viewportHeight)throw Error('Cannot measure this page.');
+    const count=8,maxScroll=Math.max(0,original.height-original.viewportHeight);
+    const delta=Math.max(170,Math.min(700,Math.ceil(maxScroll/((count-1)*4))));
+    await evaluate(tabId,scrollExpression(0));
+    for(let i=0;i<count;i++){
+      if(i>0){
+        // Trusted input advances custom scroll engines and interactive pinned scenes.
+        for(let step=0;step<4;step++){
+          await chrome.debugger.sendCommand({tabId},'Input.dispatchMouseEvent',{
+            type:'mouseWheel',
+            x:Math.max(20,Math.floor(original.viewportWidth*.55)),
+            y:Math.max(20,Math.floor(original.viewportHeight*.58)),
+            deltaX:0,deltaY:delta,modifiers:0,pointerType:'mouse'
+          });
+          await wait(90);
+        }
+      }
+      await wait(440); // Give GSAP/Lenis interpolations and Canvas frames time to draw.
+      const image=await screenshot(tabId);
+      const canvas=document.createElement('canvas');
+      canvas.width=original.viewportWidth;canvas.height=original.viewportHeight;
+      const ctx=canvas.getContext('2d',{alpha:false});
+      if(!ctx)throw Error('Unable to allocate frame image.');
+      ctx.drawImage(image,0,0,image.width,image.height,0,0,canvas.width,canvas.height);
+      const blob=await new Promise((resolve,reject)=>
+        canvas.toBlob(value=>value?resolve(value):reject(Error('PNG encoding failed.')),'image/png'));
+      const url=URL.createObjectURL(blob);urls.push(url);
+      await chrome.downloads.download({
+        url,filename:'figma-bridge/'+hostname+'-scenes/scene-'+String(i+1).padStart(2,'0')+'.png',
+        saveAs:false,conflictAction:'uniquify'
+      });
+      setStatus('Capturing actual animation states: '+(i+1)+'/'+count+' frames…');
+    }
+    setStatus('Eight separate PNG scene frames saved. For the complete motion, use Guided scroll → MP4.',false,true);
+  }catch(error){
+    setStatus('Scene capture failed: '+(error?.message||String(error))+' Try Guided scroll or Manual interactions as MP4.',true);
+  }finally{
+    if(attached){
+      if(original)try{await evaluate(tabId,scrollExpression(original.scrollY||original.nestedY||0));}catch{}
+      try{await chrome.debugger.detach({tabId});}catch{}
+    }
+    setTimeout(()=>urls.forEach(url=>URL.revokeObjectURL(url)),60000);
+    running=false;buttons.forEach(button=>button.disabled=false);sceneFramesButton.disabled=false;
+  }
+}
+if(sceneFramesButton)sceneFramesButton.addEventListener('click',captureSceneFrames);
+
 /* Motion recording is independent of full-page still-image capture. */
 const motionFormat=document.getElementById('motionFormat');
 const motionQuality=document.getElementById('motionQuality');
 const motionDuration=document.getElementById('motionDuration');
 const motionMode=document.getElementById('motionMode');
+const motionDriver=document.getElementById('motionDriver');
 const motionHelp=document.getElementById('motionHelp');
 const startRecord=document.getElementById('startRecord');
 const stopRecord=document.getElementById('stopRecord');
@@ -182,6 +248,7 @@ function syncMotionOptions(){
   if(isGif&&Number(motionDuration.value)>30)motionDuration.value='20';
   if(isGif)motionQuality.value='720';
   motionQuality.disabled=isGif;
+  motionDriver.disabled=motionMode.value!=='guided';
   motionHelp.textContent=descriptions[motionMode.value]+(isGif?' GIF is capped at 560px, 8 fps and 30 seconds.':' MP4 uses H.264 at 24 fps.');
 }
 motionFormat.addEventListener('change',syncMotionOptions);
@@ -191,7 +258,8 @@ const setMotionUi=phase=>{
   const active=phase==='recording'||phase==='starting'||phase==='saving';
   startRecord.disabled=active;
   stopRecord.style.display=phase==='recording'?'block':'none';
-  for(const control of [motionFormat,motionDuration,motionMode,motionQuality])control.disabled=active;
+  for(const control of [motionFormat,motionDuration,motionMode,motionQuality,motionDriver])control.disabled=active;
+  if(!active)syncMotionOptions();
 };
 async function getMotionState(){
   try{
@@ -217,7 +285,7 @@ startRecord.addEventListener('click',async()=>{
     if(!tab?.id||!/^https?:\/\//i.test(tab.url||''))throw Error('Open an ordinary website before recording.');
     const result=await chrome.runtime.sendMessage({
       target:'worker',type:'record-start',tabId:tab.id,
-      mode:motionMode.value,format:motionFormat.value,
+      mode:motionMode.value,driver:motionDriver.value,format:motionFormat.value,
       duration:Number(motionDuration.value),quality:Number(motionQuality.value)
     });
     if(!result?.ok)throw Error(result?.error||'Could not start recording.');
