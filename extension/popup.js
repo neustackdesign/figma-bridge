@@ -163,6 +163,48 @@ async function capture(format) {
 }
 buttons.forEach(button=>button.addEventListener('click',()=>capture(button.dataset.format)));
 
+/* Lightweight on-page diagnostics: no page content or credentials are collected. */
+const diagnoseButton=document.getElementById('inspectPage');
+const diagnostics=document.getElementById('diagnostics');
+if(diagnoseButton)diagnoseButton.addEventListener('click',async()=>{
+  diagnoseButton.disabled=true;
+  diagnostics.textContent='Inspecting scroll model…';
+  try{
+    const [tab]=await chrome.tabs.query({active:true,currentWindow:true});
+    if(!tab?.id||!/^https?:\/\//.test(tab.url||''))throw Error('Open a normal website.');
+    const result=await chrome.scripting.executeScript({
+      target:{tabId:tab.id},world:'MAIN',
+      func:()=>{
+        const doc=document.documentElement,body=document.body;
+        const styles=getComputedStyle(doc);
+        const canvases=[...document.querySelectorAll('canvas')];
+        const scrollables=[...document.querySelectorAll('main,[data-scroll-container],[data-lenis-root],[data-scroll],#app')]
+          .filter(el=>el.scrollHeight>el.clientHeight+100&&el.clientHeight>innerHeight*.5).length;
+        const triggers=typeof window.ScrollTrigger?.getAll==='function'?window.ScrollTrigger.getAll():[];
+        return {
+          viewport:innerWidth+' × '+innerHeight,
+          pageHeight:Math.max(doc.scrollHeight,body?.scrollHeight||0),
+          browserScroll:Math.max(0,doc.scrollHeight-innerHeight),
+          locked:styles.overflowY==='hidden'||getComputedStyle(body||doc).overflowY==='hidden',
+          lenis:Boolean(window.lenis),
+          smoother:Boolean(window.ScrollSmoother?.get?.()),
+          triggers:triggers.length,pinned:triggers.filter(t=>t.pin).length,
+          canvas:canvases.length,
+          scrollables
+        };
+      }
+    });
+    const d=result?.[0]?.result;
+    if(!d)throw Error('Could not inspect this website.');
+    const virtual=d.locked||d.lenis||d.smoother||d.scrollables>0||d.pinned>0;
+    const advice=virtual?'Recommended: Natural wheel MP4, or Scene frames.':'Recommended: Full-page PNG/JPG or position-based MP4.';
+    diagnostics.textContent='Viewport '+d.viewport+'; page height '+d.pageHeight+'px. '
+      +d.triggers+' GSAP triggers ('+d.pinned+' pinned); '+d.canvas+' canvas; '
+      +(d.locked?'scroll locked; ':'')+(d.lenis?'Lenis; ':'')+(d.smoother?'ScrollSmoother; ':'')
+      +advice;
+  }catch(error){diagnostics.textContent='Inspection failed: '+(error?.message||String(error));}
+  finally{diagnoseButton.disabled=false;}
+});
 /* A storyboard preserves distinct visual states instead of stitching them
  * into one physically impossible image. Captures the active, rendered tab.
  */
