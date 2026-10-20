@@ -301,7 +301,7 @@ async function captureLivePage(){
     window.ScrollTrigger?.update?.();
   }
 }
-const bookmarklet='javascript:('+captureLivePage.toString().replace(/\s*\n\s*/g,' ')+')()';
+const bookmarklet='javascript:('+captureLivePage.toString().replace(/^\s*\/\/.*$/gm,'').replace(/\s*\n\s*/g,' ')+')()';
 $('#copyBookmarklet').addEventListener('click',async()=>{try{await navigator.clipboard.writeText(bookmarklet);setStatus('Bookmarklet copied. Create a browser bookmark and paste it into the bookmark URL field.');measure('bridge_bookmarklet_copied',{source:'web'})}catch{setStatus('Clipboard blocked. Copy the bookmarklet from DevTools.',true);measure('bridge_clipboard_error',{source:'bookmarklet'})}});
 let legacyPdfJsPromise=null;
 function loadLegacyPdfJs(){
