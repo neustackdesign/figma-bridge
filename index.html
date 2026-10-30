@@ -18,6 +18,16 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
 <link href="https://fonts.googleapis.com/css2?family=Hanken+Grotesk:wght@400;500;600;700&family=Instrument+Serif:ital@0;1&display=swap" rel="stylesheet" />
 <style>
+.srOnly{position:absolute!important;width:1px;height:1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap}
+.formatPicker{height:34px;min-width:139px;max-width:165px;padding:0 8px;border:1px solid var(--border-strong);background:#fff;border-radius:8px;font-size:12px;font-weight:700}
+.formatPicker:disabled{color:var(--faint);background:#f6f4f0}
+.btn.exportAction{background:#24231f;color:#fff;border-color:#24231f}
+.btn.exportAction:hover:not(:disabled){background:#44413b;color:#fff}
+.btn.exportAction:disabled{background:#bfbab0;border-color:#bfbab0;color:#fff}
+.emptyOutputs{display:flex;flex-wrap:wrap;gap:7px;justify-content:center;margin:20px auto 0}
+.emptyOutputs span{font-size:11px;font-weight:700;border:1px solid var(--border-strong);padding:6px 9px;border-radius:6px;background:#fff}
+#exportNote{padding:10px 11px;border-radius:9px;background:#f7f5f0;border:1px solid var(--border)}
+@media(max-width:720px){.formatPicker{min-width:105px;max-width:115px}.headerActions{gap:5px}.headerActions .btn{font-size:12px;padding:0 8px}}
 :root{
   color-scheme:light;
   --canvas:#eeebe5;--dot:#d3cfc6;--white:#fff;--ink:#1a1a1a;--ink-2:#3a3833;--muted:#6e6a62;--faint:#8a867e;
@@ -46,6 +56,14 @@
     <div class="status" id="status">Load something to begin.</div>
     <div class="headerActions">
       <button class="btn" id="clearBtn">Clear</button>
+      <label class="srOnly" for="exportFormat">Export format</label>
+      <select id="exportFormat" class="formatPicker" aria-label="Export format" disabled>
+        <option value="html">HTML · offline</option>
+        <option value="png">PNG · image</option>
+        <option value="jpg">JPG · image</option>
+        <option value="pdf">PDF · document</option>
+      </select>
+      <button class="btn exportAction" id="exportBtn" disabled>Export</button>
       <button class="btn primary" id="copyFigma" disabled>Copy to Figma</button>
     </div>
   </header>
@@ -55,7 +73,8 @@
     <aside class="rail" aria-label="Import source">
       <section class="section">
         <div class="sectionHead"><span class="eyebrow">Source</span><span class="micro">local-first</span></div>
-        <h1 class="serifHead">Bring the page in.</h1>
+        <h1 class="serifHead">Start with a source.</h1>
+        <p class="micro">Import once. Export to Figma, HTML, PDF or image.</p>
         <div class="tabs" role="tablist" aria-label="Input type">
           <button class="tab active" data-pane="html-file">HTML file</button>
           <button class="tab" data-pane="paste">Paste HTML / SVG</button>
@@ -111,7 +130,7 @@
       </div>
       <div class="preview-wrap" id="previewWrap">
         <div class="preview-empty" id="previewEmpty">
-          <div class="emptyInner"><div class="emptyGlyph">↔</div><h2 class="emptyTitle">Move the work, not the pixels.</h2><p class="emptyText">Load HTML, SVG, a public page or PDF. Bridge renders it here, prepares native Figma clipboard data, then lets you paste directly into the canvas.</p></div>
+          <div class="emptyInner"><div class="emptyGlyph">↔</div><h2 class="emptyTitle">One source. Several ways out.</h2><p class="emptyText">Import HTML, SVG, a URL or a PDF. Copy editable content to Figma, or download a standalone HTML snapshot, PNG, JPG or PDF from the same workspace.</p><div class="emptyOutputs"><span>Figma layers</span><span>Offline HTML</span><span>PNG / JPG</span><span>PDF</span></div></div>
         </div>
         <div class="preview-stage" id="previewStage"></div>
       </div>
@@ -121,31 +140,32 @@
       <div class="inspectorInner">
         <section class="section">
           <span class="eyebrow">Output</span>
-          <h2 class="serifHead">What survives the bridge.</h2>
+          <h2 class="serifHead">Choose what leaves.</h2>
           <div class="inspectCard">
             <div class="cap"><span>HTML / SVG</span><span class="ok">editable + Auto Layout</span></div>
             <div class="cap"><span>Scripted HTML</span><span class="ok">render → reveal → freeze</span></div>
             <div class="cap"><span>Public URL</span><span class="ok">server HTML / live capture</span></div>
             <div class="cap"><span>PDF v1</span><span class="ok">vectors + editable text</span></div>
           </div>
-          <p class="micro">DOM → Figma is handled by <code>@figit/dom-to-figma</code>. Containers become native Auto Layout only when measured geometry can be reproduced. For live GSAP and Canvas/WebGL sites, use the browser-native image capture route when DOM layers cannot preserve the actual pixels.</p>
+          <p class="micro"><strong>Copy to Figma</strong> preserves text, vectors and Auto Layout when geometry allows. <strong>Export</strong> downloads an offline HTML snapshot, PNG, JPG or PDF. Static HTML does not recreate live JavaScript behaviour.</p>
+          <p id="exportNote" class="micro" role="status" aria-live="polite">Select a source to enable export. Web images and PDFs use the static page snapshot; the extension handles live animation and Canvas.</p>
         </section>
 
         <section class="section">
           <span class="eyebrow">Browser-native capture</span>
           <div class="inspectCard accent">
-            <div class="direction"><div class="directionMark">↓</div><div class="directionCopy"><div class="directionTitle">PNG · JPG · MP4 · GIF</div><div class="directionMeta">GSAP · WebGL · Canvas · live sites</div></div></div>
+            <div class="direction"><div class="directionMark">↓</div><div class="directionCopy"><div class="directionTitle">Capture the actual live tab</div><div class="directionMeta">Full-page PNG / JPG · MP4 / GIF · GSAP / WebGL</div></div></div>
             <p class="micro">Use the companion Chrome extension on the actual site. Export full-page screenshots, or record actual scrolling, looping and interactive animations as local MP4 or GIF; editable Figma capture stays separate.</p>
-            <div class="inspectorActions"><a class="btn primary" href="https://github.com/neustackdesign/figma-bridge/actions/workflows/motion-capture.yml" target="_blank" rel="noreferrer">Get capture companion</a></div>
+            <div class="inspectorActions"><a class="btn primary" href="https://github.com/neustackdesign/figma-bridge/actions/workflows/motion-capture.yml" target="_blank" rel="noreferrer">Install Chrome capture extension</a></div>
           </div>
         </section>
 
         <section class="section">
           <span class="eyebrow">Reverse direction</span>
           <div class="inspectCard accent">
-            <div class="direction"><div class="directionMark">←</div><div class="directionCopy"><div class="directionTitle">Figma → standalone HTML</div><div class="directionMeta">companion development plugin</div></div></div>
+            <div class="direction"><div class="directionMark">←</div><div class="directionCopy"><div class="directionTitle">Turn Figma frames into websites</div><div class="directionMeta">Editable text · SVG vectors · Auto Layout → CSS</div></div></div>
             <ol class="installSteps"><li>Import the plugin manifest in Figma Desktop.</li><li>Select one or more frames.</li><li>Export one self-contained HTML file.</li></ol>
-            <div class="inspectorActions"><a class="btn primary" href="./plugin/" target="_blank" rel="noreferrer">Install exporter</a><a class="btn" href="https://github.com/neustackdesign/figma-bridge#readme" target="_blank" rel="noreferrer">Build notes</a></div>
+            <div class="inspectorActions"><a class="btn primary" href="./plugin/" target="_blank" rel="noreferrer">Get Figma HTML exporter</a><a class="btn" href="https://github.com/neustackdesign/figma-bridge#readme" target="_blank" rel="noreferrer">How it works</a></div>
           </div>
         </section>
 
@@ -159,6 +179,7 @@
 </div>
 <script src="./analytics.js" defer></script>
 <script type="module">
+import {bundleSnapshot,saveBlob,renderSnapshotCanvas,imageBlob,canvasToPDF} from './exporter/snapshot.js';
 const $=s=>document.querySelector(s);
 const status=$('#status'),stage=$('#previewStage'),empty=$('#previewEmpty'),copyBtn=$('#copyFigma'),previewWrap=$('#previewWrap');
 const CAPTURE_W=1440,CAPTURE_H=900;
