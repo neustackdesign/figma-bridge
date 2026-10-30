@@ -9,7 +9,7 @@ assert.ok(manifest.permissions.includes('downloads'));
 assert.ok(manifest.permissions.includes('activeTab'));
 
 const index=await fs.readFile('index.html','utf8');
-const inline=index.match(/<script type="module">\s*(const \$=[\s\S]*?)<\/script>/);
+const inline=index.match(/<script type="module">\s*(?:import[^\n]*\n)?(const \$=[\s\S]*?)<\/script>/);
 assert.ok(inline,'browser app script not found');
 new vm.Script(inline[1],{filename:'index.html inline'});
 assert.match(inline[1],/captureLivePage\.toString\(\)\.replace/,'bookmarklet should be derived from live capture function');
