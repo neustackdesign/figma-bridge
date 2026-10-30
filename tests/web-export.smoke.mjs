@@ -51,6 +51,7 @@ try{
       return route.fulfill({contentType:'text/css',headers:{'X-Final-Url':'https://assets.example/design.css'},body:'h1{background-image:url("pixel.png")}'});
     }
     if(target.searchParams.get('mode')==='asset'){
+      if(target.searchParams.get('url')?.endsWith('/404.png'))return route.fulfill({status:400,contentType:'application/json',body:'{"error":"Asset not found"}'});
       return route.fulfill({contentType:'image/png',body:png});
     }
     if(target.searchParams.get('mode')==='html'){
@@ -68,6 +69,14 @@ try{
   assert.match(packaged.html,/data:image\/png;base64,/);
   assert.doesNotMatch(packaged.html,/https:\/\/assets\.example\/design\.css/);
   assert.doesNotMatch(packaged.html,/<script/);
+  await assert.rejects(
+    page.evaluate(async()=>{
+      const {bundleSnapshot}=await import('/exporter/snapshot.js');
+      return bundleSnapshot('<html><body><img src="https://assets.example/404.png"></body></html>','https://assets.example/');
+    }),
+    /Standalone export blocked/,
+    'Missing public assets must not silently generate broken offline HTML'
+  );
   await page.route('https://assets.example/**',route=>{
     const target=route.request().url();
     return target.endsWith('.css')?route.fulfill({contentType:'text/css',body:'h1{color:#124b38}'}):route.fulfill({contentType:'image/png',body:png});
@@ -86,6 +95,13 @@ try{
   await page.waitForFunction(()=>document.querySelector('#status')?.textContent?.startsWith('Ready: 1 PDF'),{timeout:30000});
   const restoredPdf=await download('pdf');
   assert.deepEqual(restoredPdf,pdf,'Original PDF bytes were unnecessarily changed');
+  const pdfAsPNG=await download('png');
+  assert.equal(pdfAsPNG.subarray(0,8).toString('hex'),'89504e470d0a1a0a','PDF-to-PNG failed');
+  await page.locator('#exportFormat').selectOption('html');
+  await page.locator('#exportBtn').click();
+  assert.match(await page.locator('#status').innerText(),/PDF-to-HTML is not available/);
+  assert.equal(await page.locator('#copyFigma').isEnabled(),true);
+  assert.equal(await page.locator('#exportBtn').isEnabled(),true);
   results.push({format:'pdf-reimport',passed:true,size:restoredPdf.length});
   // JavaScript-backed uploaded artifacts remain sandboxed, but export a static DOM result.
   await page.getByRole('button',{name:'Paste HTML / SVG'}).click();
