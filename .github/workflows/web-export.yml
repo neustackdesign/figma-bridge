@@ -59,7 +59,7 @@ jobs:
           node --test tests/analytics-consent.test.mjs tests/seo-smoke.mjs
       - name: Start isolated Bridge static app
         run: |
-          cd dist && python3 -m http.server 3200 --bind 127.0.0.1 > /tmp/bridge-web-export.log 2>&1 &
+          node tests/local-server.mjs > /tmp/bridge-web-export.log 2>&1 &
           for i in $(seq 1 30); do if curl -fsS http://127.0.0.1:3200/ >/dev/null; then break; fi; sleep 1; done
       - name: Verify existing Figma conversion clipboard
         run: node tests/clipboard-smoke.mjs
