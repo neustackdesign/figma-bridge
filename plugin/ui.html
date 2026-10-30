@@ -13,7 +13,7 @@ nav button[aria-selected=true]{color:var(--accent);border-color:var(--accent)}
 main{padding:15px 17px 18px}
 section[hidden]{display:none}
 .panel{background:#fff;border:1px solid var(--line);padding:13px;border-radius:10px;margin-bottom:11px}
-.panel h2{font-size:14px;line-height:1.25;margin:0 0 5px;letter-spacing:-.02em}
+ .pluginHero{border-color:#e5bba9;background:linear-gradient(145deg,#fffaf7,#fff);box-shadow:inset 3px 0 0 var(--accent)}.pluginHero h2{font-size:17px}.panel h2{font-size:14px;line-height:1.25;margin:0 0 5px;letter-spacing:-.02em}
 .panel p{font-size:11.5px;color:var(--muted);margin:0 0 10px}
 .pill{display:inline-block;padding:2px 6px;border-radius:3px;background:#eeece7;color:#5b574e;font-size:9px;font-weight:700;letter-spacing:.03em;text-transform:uppercase;margin-bottom:8px}
 .actions{display:flex;gap:7px;flex-wrap:wrap}
@@ -39,15 +39,15 @@ footer{padding:0 18px 15px;color:var(--muted);font-size:10px;line-height:1.45}
 <button id="nav-export" data-tab="export" role="tab" aria-selected="false">Figma → Web</button></nav>
 <main>
 <section id="panel-overview" role="tabpanel">
-<div class="panel"><div class="pill">Browser application</div><h2>Make browser layouts editable</h2>
-<p>Import HTML, SVG, PDF and websites into editable Figma layers when the underlying DOM supports it.</p>
-<div class="actions"><a class="action" href="https://bridge.neustackstudio.com/" target="_blank" rel="noopener noreferrer">Open browser app ↗</a></div></div>
-<div class="panel"><div class="pill">Chrome / Edge companion</div><h2>Capture static and moving websites</h2>
-<p>Full-page PNG/JPG screenshots; guided scroll, hero loops and manual interaction recordings as MP4/GIF.</p>
+<div class="panel pluginHero"><div class="pill">Ready in this Figma file</div><h2>Your Figma frames, as standalone HTML.</h2>
+<p>Export selected frames with real text, inline SVG and CSS flex layout. Images embed directly in the file. No hosting or account required.</p>
+<div class="actions"><button class="action" id="overviewExport" type="button">Export selected Figma layers →</button></div></div>
+<div class="panel"><div class="pill">Bridge web workspace</div><h2>From websites into Figma or other formats</h2>
+<p>Import HTML, SVG, PDF or a URL. Copy editable layers to Figma, or download offline HTML, PNG, JPG and PDF.</p>
+<div class="actions"><a class="action" href="https://bridge.neustackstudio.com/" target="_blank" rel="noopener noreferrer">Open Bridge web app ↗</a></div></div>
+<div class="panel"><div class="pill">Chrome / Edge capture</div><h2>Capture live animation and Canvas</h2>
+<p>Full-page PNG/JPG and actual scroll/interaction recording as MP4/GIF, including GSAP or WebGL experiences.</p>
 <div class="actions"><a class="action" href="https://github.com/neustackdesign/figma-bridge/actions/workflows/motion-capture.yml" target="_blank" rel="noopener noreferrer">Get capture extension ↗</a></div></div>
-<div class="panel"><div class="pill">This Figma plugin</div><h2>Export editable frames to HTML</h2>
-<p>Select a Figma frame or layers, then export one self-contained HTML document.</p>
-<div class="actions"><button class="action" id="overviewExport" type="button">Open export ↗</button></div></div>
 </section>
 <section id="panel-import" role="tabpanel" hidden>
 <div class="panel"><div class="pill">Works in your browser</div><h2>Browser → Figma</h2>
