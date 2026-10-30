@@ -24,6 +24,12 @@
 .btn.exportAction{background:#24231f;color:#fff;border-color:#24231f}
 .btn.exportAction:hover:not(:disabled){background:#44413b;color:#fff}
 .btn.exportAction:disabled{background:#bfbab0;border-color:#bfbab0;color:#fff}
+.exportTiles{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
+.exportTiles button{border:1px solid var(--border-strong);border-radius:9px;background:#faf9f6;padding:11px;text-align:left;display:flex;flex-direction:column;gap:4px}
+.exportTiles button:not(:disabled):hover{background:#f6ebe4;border-color:#d5a28e}
+.exportTiles button strong{font-size:13px;font-weight:750}
+.exportTiles button span{font-size:11px;color:var(--muted)}
+.exportTiles button:disabled{opacity:.5;cursor:not-allowed}
 .emptyOutputs{display:flex;flex-wrap:wrap;gap:7px;justify-content:center;margin:20px auto 0}
 .emptyOutputs span{font-size:11px;font-weight:700;border:1px solid var(--border-strong);padding:6px 9px;border-radius:6px;background:#fff}
 #exportNote{padding:10px 11px;border-radius:9px;background:#f7f5f0;border:1px solid var(--border)}
@@ -149,14 +155,11 @@
           </div>
           <p class="micro"><strong>Copy to Figma</strong> preserves text, vectors and Auto Layout when geometry allows. <strong>Export</strong> downloads an offline HTML snapshot, PNG, JPG or PDF. Static HTML does not recreate live JavaScript behaviour.</p>
           <p id="exportNote" class="micro" role="status" aria-live="polite">Select a source to enable export. Web images and PDFs use the static page snapshot; the extension handles live animation and Canvas.</p>
-        </section>
-
-        <section class="section">
-          <span class="eyebrow">Browser-native capture</span>
-          <div class="inspectCard accent">
-            <div class="direction"><div class="directionMark">↓</div><div class="directionCopy"><div class="directionTitle">Capture the actual live tab</div><div class="directionMeta">Full-page PNG / JPG · MP4 / GIF · GSAP / WebGL</div></div></div>
-            <p class="micro">Use the companion Chrome extension on the actual site. Export full-page screenshots, or record actual scrolling, looping and interactive animations as local MP4 or GIF; editable Figma capture stays separate.</p>
-            <div class="inspectorActions"><a class="btn primary" href="https://github.com/neustackdesign/figma-bridge/actions/workflows/motion-capture.yml" target="_blank" rel="noreferrer">Install Chrome capture extension</a></div>
+          <div class="exportTiles" role="group" aria-label="Download preview">
+            <button type="button" data-export-kind="html" disabled><strong>HTML</strong><span>Offline webpage</span></button>
+            <button type="button" data-export-kind="png" disabled><strong>PNG</strong><span>Lossless image</span></button>
+            <button type="button" data-export-kind="jpg" disabled><strong>JPG</strong><span>Compressed image</span></button>
+            <button type="button" data-export-kind="pdf" disabled><strong>PDF</strong><span>Shareable document</span></button>
           </div>
         </section>
 
@@ -166,6 +169,15 @@
             <div class="direction"><div class="directionMark">←</div><div class="directionCopy"><div class="directionTitle">Turn Figma frames into websites</div><div class="directionMeta">Editable text · SVG vectors · Auto Layout → CSS</div></div></div>
             <ol class="installSteps"><li>Import the plugin manifest in Figma Desktop.</li><li>Select one or more frames.</li><li>Export one self-contained HTML file.</li></ol>
             <div class="inspectorActions"><a class="btn primary" href="./plugin/" target="_blank" rel="noreferrer">Get Figma HTML exporter</a><a class="btn" href="https://github.com/neustackdesign/figma-bridge#readme" target="_blank" rel="noreferrer">How it works</a></div>
+          </div>
+        </section>
+
+        <section class="section">
+          <span class="eyebrow">Browser-native capture</span>
+          <div class="inspectCard accent">
+            <div class="direction"><div class="directionMark">↓</div><div class="directionCopy"><div class="directionTitle">Capture the actual live tab</div><div class="directionMeta">Full-page PNG / JPG · MP4 / GIF · GSAP / WebGL</div></div></div>
+            <p class="micro">Use the companion Chrome extension on the actual site. Export full-page screenshots, or record actual scrolling, looping and interactive animations as local MP4 or GIF; editable Figma capture stays separate.</p>
+            <div class="inspectorActions"><a class="btn primary" href="https://github.com/neustackdesign/figma-bridge/actions/workflows/motion-capture.yml" target="_blank" rel="noreferrer">Install Chrome capture extension</a></div>
           </div>
         </section>
 
@@ -187,7 +199,7 @@ const CAPTURE_W=1440,CAPTURE_H=900;
 const measure=(event,props={})=>window.bridgeTrack?.(event,props);
 let mode=null,frameSpecs=[],figmaConverter=null,scriptedFrame=null,scriptedToken=null,scriptedClipboardHtml=null,scriptedPreparing=false,scriptedLastSignature='',scriptedStableCount=0,currentPreviewFrame=null;
 let sourceBase=location.href,sourceName='bridge-export',pdfSourceFile=null,scriptedSnapshotResolve=null,scriptedSnapshotReject=null;
-function setExportReady(ready){exportBtn.disabled=!ready;exportFormat.disabled=!ready;exportNote.textContent=ready?'Export a static offline HTML document, or download a PNG, JPG or PDF. Source scripts are not included.':'Select a source to enable export. Web images and PDFs use the static page snapshot; the extension handles live animation and Canvas.';}
+function setExportReady(ready){document.querySelectorAll('[data-export-kind]').forEach(button=>button.disabled=!ready);exportBtn.disabled=!ready;exportFormat.disabled=!ready;exportNote.textContent=ready?'Export a static offline HTML document, or download a PNG, JPG or PDF. Source scripts are not included.':'Select a source to enable export. Web images and PDFs use the static page snapshot; the extension handles live animation and Canvas.';}
 function safeName(name){return String(name||'bridge-export').replace(/[^a-z0-9._-]+/gi,'-').replace(/^-+|-+$/g,'').slice(0,75)||'bridge-export';}
 function setStatus(message,error=false,ok=false){status.textContent=message;status.className='status'+(error?' error':ok?' ok':'')}
 function fitPreview(){if(!currentPreviewFrame)return;const available=Math.max(240,previewWrap.clientWidth-36);const scale=Math.min(1,available/CAPTURE_W);currentPreviewFrame.style.transform=`scale(${scale})`;stage.style.width=(CAPTURE_W*scale)+'px';stage.style.height=(CAPTURE_H*scale)+'px'}
@@ -493,6 +505,7 @@ async function pdfImageCanvas(file){
   }
   return output;
 }
+document.querySelectorAll('[data-export-kind]').forEach(button=>button.addEventListener('click',()=>{if(button.disabled)return;exportFormat.value=button.dataset.exportKind;exportBtn.click()}));
 exportBtn.addEventListener('click',async()=>{
   if(!mode||exportBtn.disabled)return;
   const format=exportFormat.value,name=safeName(sourceName),originalLabel=exportBtn.textContent;
