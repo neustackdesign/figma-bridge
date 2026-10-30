@@ -6,8 +6,9 @@ A lightweight, local-first bridge for moving visual work between browser documen
 
 Figma Bridge has **two separate pieces**:
 
-1. **Browser app** — HTML / SVG / website / PDF → Figma.
+1. **Browser app** — HTML / SVG / website / PDF → Figma **or** standalone HTML, PNG, JPG and PDF.
 2. **Figma development plugin** — Figma → standalone HTML.
+3. **Chrome/Edge companion** — real live-tab captures (PNG/JPG/MP4/GIF), especially for GSAP/Canvas/WebGL.
 
 You do **not** need the Figma plugin to import HTML into Figma.
 
@@ -17,6 +18,8 @@ From the repo folder:
 
 ```bash
 cd ~/Code/figma-bridge
+npm install
+npm run build
 npx vercel dev
 ```
 
@@ -36,7 +39,7 @@ At `http://localhost:3000`:
 
 - **HTML file** → choose/drop a `.html` file.
 - **Paste HTML / SVG** → paste markup and render it.
-- **Website URL** → fetch the public server HTML. It cannot execute third-party website scripts. For live, JS-rendered, GSAP or scroll-reveal states, use the bookmarklet for editable DOM layers; for Canvas/WebGL and visual fidelity, use the browser-native image exporter below.
+- **Website URL** → fetch public server HTML and export it as a static standalone page or Figma layers. It cannot execute third-party website scripts. For live, JS-rendered, GSAP or scroll-reveal states, use the bookmarklet for editable DOM layers; for Canvas/WebGL and visual fidelity, use the browser-native image exporter below.
 - **PDF** → reconstructs each page from PDF vectors/text/images first; pages fall back to raster only when reconstruction cannot be completed safely.
 
 When the preview says **Ready**:
@@ -44,6 +47,23 @@ When the preview says **Ready**:
 1. Click **Copy to Figma**.
 2. Switch to any Figma design file/page.
 3. Paste with `⌘V` / `Ctrl+V`.
+
+## Export directly from the Bridge web workspace
+
+Once a source says **Ready**, choose a format in the top toolbar or use the four **Export** tiles in the right panel:
+
+- **HTML:** downloads a single offline **static** file. Bridge embeds CSS, images and fonts (subject to 160 resources / 48 MB); rewrites relative URLs and removes scripts and inline event handlers. A missing required asset stops the export rather than quietly producing a broken file. Links to other webpages may still navigate online.
+- **PNG/JPG:** rasterises the same prepared snapshot of the full page, up to 16,384 px per side / 80 megapixels. If the page exceeds that limit, the app shows a clear error and recommends the Chrome companion.
+- **PDF:** converts the static page capture into A4 pages. Text in this output is part of the image rather than a fully editable/selectable PDF text layer. When the source itself is an imported PDF, the **PDF** choice returns the **unaltered original PDF bytes**.
+- **Figma:** **Copy to Figma** remains independent; its existing editable conversion and clipboard semantics are unchanged.
+
+For JavaScript-backed uploaded HTML, the sandbox returns a snapshot of the rendered DOM and strips scripts from the exported file. For public website URLs, Bridge intentionally fetches **server HTML** without executing third-party scripts. For sites that rely on GSAP, client-side React rendering, Canvas or WebGL, open the real site and use the Chrome companion instead.
+
+The same local-only pinned build now serves the browser conversion engine, image/PDF engines and PDF reconstruction assets from Bridge's own origin. No paid screenshot/rendering service or new account is needed. The existing SSRF-hardened proxy is only used to retrieve public CSS, fonts and image resources for bundling.
+
+### Regression and acceptance
+
+Run `npm install && npm run build`, then use the CI checks in `.github/workflows/web-export.yml`. They build the static app and extension, verify the prior Figma clipboard path, PDF/plugin exporter, motion capture and analytics assertions, then use real Chromium to download HTML/PNG/JPG/PDF, embed page assets, and exercise URL and PDF round-trips. A native Figma Desktop paste and complex GSAP/Canvas visual comparison still require manual acceptance.
 
 Static HTML is inspected directly. Packaged HTML containing JavaScript is rendered first inside a sandboxed opaque-origin iframe, then the rendered DOM is converted. This supports packaged/browser artifacts that reconstruct themselves with JavaScript instead of exposing their final DOM in the source file.
 
