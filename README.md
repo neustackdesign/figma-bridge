@@ -4,7 +4,7 @@ A lightweight, local-first bridge for moving visual work between browser documen
 
 ## What runs where
 
-Figma Bridge has **two separate pieces**:
+Figma Bridge has **three connected components**:
 
 1. **Browser app** — HTML / SVG / website / PDF → Figma **or** standalone HTML, PNG, JPG and PDF.
 2. **Figma development plugin** — Figma → standalone HTML.
