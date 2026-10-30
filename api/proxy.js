@@ -3,6 +3,7 @@ import { isIP } from 'node:net';
 
 const MAX_HTML_BYTES = 5 * 1024 * 1024;
 const MAX_ASSET_BYTES = 15 * 1024 * 1024;
+const MAX_STYLESHEET_BYTES = 2 * 1024 * 1024;
 const MAX_REDIRECTS = 4;
 
 function isPrivateIPv4(address) {
@@ -171,11 +172,20 @@ export default async function handler(req, res) {
   if (req.method !== 'GET') return res.status(405).json({ error: 'GET only.' });
 
   try {
-    const mode = req.query.mode === 'asset' ? 'asset' : 'html';
+    const mode = ['asset', 'stylesheet'].includes(req.query.mode) ? req.query.mode : 'html';
     const target = validateUrl(req.query.url);
     const response = await fetchWithSafeRedirects(target.href);
     if (!response.ok) throw new Error(`Origin returned HTTP ${response.status}.`);
 
+    if (mode === 'stylesheet') {
+      const type = (response.headers.get('content-type') || '').toLowerCase();
+      if (!type.includes('text/css')) throw new Error('Expected a CSS stylesheet, received ' + (type || 'unknown MIME type') + '.');
+      const bytes = await readLimited(response, MAX_STYLESHEET_BYTES);
+      res.setHeader('Content-Type', 'text/css; charset=utf-8');
+      res.setHeader('X-Final-Url', response.url || target.href);
+      res.setHeader('Access-Control-Expose-Headers', 'X-Final-Url');
+      return res.status(200).send(Buffer.from(bytes));
+    }
     if (mode === 'asset') {
       const type = (response.headers.get('content-type') || '').toLowerCase();
       if (type && !type.startsWith('image/') && !type.startsWith('font/') && !type.includes('octet-stream')) {
