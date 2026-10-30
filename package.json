@@ -8,11 +8,17 @@
   },
   "scripts": {
     "build:extension": "esbuild extension/recorder.source.js --bundle --format=iife --target=chrome116 --outfile=extension/recorder.js --minify",
-    "test:motion": "node tests/motion-capture.test.mjs"
+    "test:motion": "node tests/motion-capture.test.mjs",
+    "build": "node scripts/build-web.mjs",
+    "build:vendor": "node scripts/build-web.mjs"
   },
   "dependencies": {
     "gifenc": "1.0.3",
-    "mp4-muxer": "5.2.2"
+    "mp4-muxer": "5.2.2",
+    "@figit/dom-to-figma": "0.2.4",
+    "html2canvas": "1.4.1",
+    "jspdf": "2.5.2",
+    "pdfjs-dist": "3.11.174"
   },
   "devDependencies": {
     "esbuild": "0.25.12"
