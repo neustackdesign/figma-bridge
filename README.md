@@ -52,7 +52,7 @@ When the preview says **Ready**:
 
 Once a source says **Ready**, choose a format in the top toolbar or use the four **Export** tiles in the right panel:
 
-- **HTML:** downloads a single offline **static** file. Bridge embeds CSS, images and fonts (subject to 160 resources / 48 MB); rewrites relative URLs and removes scripts and inline event handlers. A missing required asset stops the export rather than quietly producing a broken file. Links to other webpages may still navigate online.
+- **HTML:** downloads a single offline **static** file. Bridge embeds CSS, images and fonts (subject to 160 resources / 48 MB); rewrites relative URLs and removes scripts and inline event handlers. A missing required visual asset stops the export rather than quietly producing a broken file; invisible tracking beacons (for example, Facebook's 1×1 noscript PageView pixel) are removed without being fetched and reported as warnings. Links to other webpages may still navigate online.
 - **PNG/JPG:** rasterises the same prepared snapshot of the full page, up to 16,384 px per side / 80 megapixels. If the page exceeds that limit, the app shows a clear error and recommends the Chrome companion.
 - **PDF:** converts the static page capture into A4 pages. Text in this output is part of the image rather than a fully editable/selectable PDF text layer. When the source itself is an imported PDF, the **PDF** choice returns the **unaltered original PDF bytes**.
 - **Figma:** **Copy to Figma** remains independent; its existing editable conversion and clipboard semantics are unchanged.

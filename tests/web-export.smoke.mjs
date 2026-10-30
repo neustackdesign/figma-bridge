@@ -69,6 +69,25 @@ try{
   assert.match(packaged.html,/data:image\/png;base64,/);
   assert.doesNotMatch(packaged.html,/https:\/\/assets\.example\/design\.css/);
   assert.doesNotMatch(packaged.html,/<script/);
+  // Reproduce a real-world no-script Facebook PageView pixel. It is invisible
+  // and returns text/plain instead of an image. It must never block export.
+  const beaconResult=await page.evaluate(async()=>{
+    const {bundleSnapshot}=await import('/exporter/snapshot.js');
+    const markup='<html><body><h1>Visible GPC page</h1><noscript><img height="1" width="1" style="display:none" src="https://www.facebook.com/tr?id=123456789&amp;ev=PageView&amp;noscript=1"></noscript></body></html>';
+    return bundleSnapshot(markup,'https://www.gpc.consulting/');
+  });
+  assert.match(beaconResult.html,/Visible GPC page/);
+  assert.doesNotMatch(beaconResult.html,/facebook\.com\/tr|PageView|noscript=1/);
+  assert.ok(beaconResult.warnings.some(x=>/Removed 1 non-visual tracking pixel/.test(x)));
+  // Nonvisual generic one-pixel placeholders are excluded too, but ordinary
+  // content images remain mandatory and retain the existing hard-error policy.
+  const hiddenResult=await page.evaluate(async()=>{
+    const {bundleSnapshot}=await import('/exporter/snapshot.js');
+    return bundleSnapshot('<html><body><img width="1" height="1" style="visibility:hidden" src="https://assets.example/404.png"><h2>Content survived</h2></body></html>','https://assets.example/');
+  });
+  assert.match(hiddenResult.html,/Content survived/);
+  assert.doesNotMatch(hiddenResult.html,/404\.png/);
+  assert.ok(hiddenResult.warnings.length);
   await assert.rejects(
     page.evaluate(async()=>{
       const {bundleSnapshot}=await import('/exporter/snapshot.js');
