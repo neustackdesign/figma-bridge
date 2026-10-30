@@ -2,8 +2,8 @@
 const MAX_ASSETS=160;
 const MAX_BYTES=48*1024*1024;
 const MAX_CSS_DEPTH=4;
-const HTML2CANVAS_URL='https://esm.sh/html2canvas@1.4.1?bundle';
-const JSPDF_URL='https://esm.sh/jspdf@2.5.2?bundle';
+const HTML2CANVAS_URL='/vendor/html2canvas.js';
+const JSPDF_URL='/vendor/jspdf.js';
 
 function isIgnoredURL(value){
   return !value || /^(?:data:|#|about:)/i.test(value.trim());
