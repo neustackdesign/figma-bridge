@@ -4,13 +4,13 @@
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width,initial-scale=1" />
 <meta name="theme-color" content="#ffffff" />
-<title>Figma Bridge — Browser ↔ Figma</title>
-<meta name="description" content="Move browser work into editable Figma layers, and export Figma frames back to standalone HTML." />
+<title>Figma Bridge — Web to Figma, HTML, PNG, JPG and PDF</title>
+<meta name="description" content="Import websites, HTML, SVG and PDFs. Export offline HTML, PNG, JPG or PDF, copy editable layers into Figma, or capture real websites with the Chrome companion." />
 <link rel="canonical" href="https://bridge.neustackstudio.com/" />
 <meta name="robots" content="index, follow" />
 <meta property="og:type" content="website" />
 <meta property="og:title" content="Figma Bridge — Browser ↔ Figma" />
-<meta property="og:description" content="Move browser work into editable Figma layers, and export Figma frames back to standalone HTML." />
+<meta property="og:description" content="A workspace for web-to-Figma conversion and standalone HTML, PNG, JPG and PDF exports. Plus a native Figma HTML exporter." />
 <meta property="og:url" content="https://bridge.neustackstudio.com/" />
 <meta name="twitter:card" content="summary" />
 <link rel="icon" href="./icon.svg" type="image/svg+xml" />
@@ -541,7 +541,7 @@ exportBtn.addEventListener('click',async()=>{
     }
     if(!blob?.size)throw new Error('Export produced an empty file.');
     saveBlob(blob,name+'.'+format);
-    setStatus('Exported '+name+'.'+format+' ('+Math.round(blob.size/1024)+' KB).'+(meta?' '+meta:''),false,true);
+    setStatus('Exported '+name+'.'+format+' ('+Math.max(1,Math.ceil(blob.size/1024))+' KB).'+(meta?' '+meta:''),false,true);
     measure('bridge_export_success',{mode,format,bytes:blob.size});
   }catch(err){
     console.error('Bridge export failed',err);
