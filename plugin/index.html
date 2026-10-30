@@ -24,15 +24,15 @@
 <body>
 <header class="header"><div class="brand"><span class="wordmark">Figma Bridge</span><span class="tag">Figma → HTML</span></div><a class="back" href="../">← Back to Bridge</a></header>
 <main class="main"><div class="inner">
-  <div><div class="eyebrow">Companion exporter</div><h1>Take the frame back to the browser.</h1></div>
-  <p>The reverse half of Figma Bridge is a local development plugin. Keep these three files together, import the manifest in Figma Desktop, then export selected frames as one self-contained HTML file.</p>
+  <div><div class="eyebrow">Companion exporter</div><h1>Export Figma frames as HTML.</h1></div>
+  <p>Turn native Figma frames into a standalone webpage. Bridge preserves editable text, exports vector shapes as inline SVG, translates Auto Layout into CSS flex, and embeds images. No account or backend required. Install the local Figma development plugin using the files below.</p>
   <div class="surface">
     <a class="file" href="./manifest.json" download><span class="fileMark">JSON</span><span class="fileCopy"><span class="fileName">manifest.json</span><span class="fileMeta">plugin definition</span></span><span class="download">Download</span></a>
     <a class="file" href="./code.js" download><span class="fileMark">JS</span><span class="fileCopy"><span class="fileName">code.js</span><span class="fileMeta">Figma document exporter</span></span><span class="download">Download</span></a>
     <a class="file" href="./ui.html" download><span class="fileMark">HTML</span><span class="fileCopy"><span class="fileName">ui.html</span><span class="fileMeta">plugin interface</span></span><span class="download">Download</span></a>
   </div>
-  <div class="steps"><div class="step"><div class="num">01</div><div class="stepTitle">Make one folder</div><div class="stepText">Put all three downloaded files in <code>figma-bridge-export-html</code>.</div></div><div class="step"><div class="num">02</div><div class="stepTitle">Import the manifest</div><div class="stepText">Figma Desktop → Plugins → Development → Import plugin from manifest.</div></div><div class="step"><div class="num">03</div><div class="stepTitle">Select and export</div><div class="stepText">Select frame(s), run <strong>Figma Bridge — Export HTML</strong>, then export.</div></div></div>
-  <div class="note"><strong>What the exporter preserves.</strong> Auto Layout becomes CSS flex, text stays editable, vectors become inline SVG, image fills are embedded, and unsupported complex layers rasterize only as a fallback.</div>
+  <div class="steps"><div class="step"><div class="num">01</div><div class="stepTitle">Make one folder</div><div class="stepText">Put all three downloaded files in <code>figma-bridge-export-html</code>.</div></div><div class="step"><div class="num">02</div><div class="stepTitle">Import the manifest</div><div class="stepText">Figma Desktop → Plugins → Development → Import plugin from manifest.</div></div><div class="step"><div class="num">03</div><div class="stepTitle">Select and export</div><div class="stepText">Select frames, run <strong>Figma Bridge — Export HTML</strong> and download one standalone HTML document.</div></div></div>
+  <div class="note"><strong>What survives.</strong> Auto Layout → CSS flex, editable text, SVG vectors, embedded image fills and a raster fallback for unsupported layers. Figma prototype behaviour is not generated as JavaScript.</div>
 </div></main>
 </body>
 </html>
