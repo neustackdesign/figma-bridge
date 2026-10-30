@@ -53,6 +53,10 @@ try{
     if(target.searchParams.get('mode')==='asset'){
       return route.fulfill({contentType:'image/png',body:png});
     }
+    if(target.searchParams.get('mode')==='html'){
+      const data={html:'<!doctype html><html><head><title>Remote fixture</title><link rel="stylesheet" href="https://assets.example/design.css"></head><body><h1>Imported URL proof</h1><img src="https://assets.example/pixel.png"></body></html>',finalUrl:'https://assets.example/landing'};
+      return route.fulfill({contentType:'application/json',body:JSON.stringify(data)});
+    }
     return route.continue();
   });
   const packaged=await page.evaluate(async()=>{
@@ -64,6 +68,30 @@ try{
   assert.match(packaged.html,/data:image\/png;base64,/);
   assert.doesNotMatch(packaged.html,/https:\/\/assets\.example\/design\.css/);
   assert.doesNotMatch(packaged.html,/<script/);
+  // Server-HTML URL import, relative asset resolution and standalone download.
+  await page.getByRole('button',{name:'Website URL'}).click();
+  await page.locator('#urlInput').fill('https://assets.example/landing');
+  await page.locator('#loadUrl').click();
+  await page.waitForFunction(()=>document.querySelector('#status')?.textContent?.startsWith('Ready:'),{timeout:20000});
+  const importedHTML=String(await download('html'));
+  assert.match(importedHTML,/Imported URL proof/);
+  assert.match(importedHTML,/data:image\/png;base64,/);
+  // Source PDF remains byte-for-byte original after importing/reconstructing it.
+  await page.getByRole('button',{name:'PDF',exact:true}).click();
+  await page.locator('#pdfInput').setInputFiles({name:'source.pdf',mimeType:'application/pdf',buffer:pdf});
+  await page.waitForFunction(()=>document.querySelector('#status')?.textContent?.startsWith('Ready: 1 PDF'),{timeout:30000});
+  const restoredPdf=await download('pdf');
+  assert.deepEqual(restoredPdf,pdf,'Original PDF bytes were unnecessarily changed');
+  results.push({format:'pdf-reimport',passed:true,size:restoredPdf.length});
+  // JavaScript-backed uploaded artifacts remain sandboxed, but export a static DOM result.
+  await page.getByRole('button',{name:'Paste HTML / SVG'}).click();
+  await page.locator('#pasteInput').fill('<html><head><style>body{margin:0}</style></head><body><main id="result">Loading…</main><script>document.getElementById("result").textContent="Rendered by script"</script></body></html>');
+  await page.locator('#renderPaste').click();
+  await page.waitForFunction(()=>document.querySelector('#status')?.textContent?.startsWith('Ready:'),{timeout:35000});
+  const scriptedHTML=String(await download('html'));
+  assert.match(scriptedHTML,/Rendered by script/);
+  assert.doesNotMatch(scriptedHTML,/<script/i);
+  results.push({format:'scripted-dom',passed:true});
   await page.locator('#clearBtn').click();
   assert.equal(await page.locator('#exportBtn').isDisabled(),true);
   assert.equal(await page.locator('#copyFigma').isDisabled(),true);
