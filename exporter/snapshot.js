@@ -36,6 +36,57 @@ async function toDataURL(blob){
     reader.readAsDataURL(blob);
   });
 }
+/**
+ * Remove non-visual telemetry pixels from a static document before embedding assets.
+ * Do not remove visible artwork, or turn a missing design image into a silent success.
+ * Tracking image URLs are not fetched at all.
+ */
+function isTelemetryURL(raw,base){
+  let url;
+  try{url=new URL(raw,base)}catch{return false}
+  const host=url.hostname.toLowerCase().replace(/^www\./,'');
+  const path=url.pathname.toLowerCase();
+  const domain=target=>host===target||host.endsWith('.'+target);
+  return (
+    (domain('facebook.com')&&/^\/tr\/?$/.test(path)) ||
+    (domain('facebook.net')&&/^\/tr\/?$/.test(path)) ||
+    (domain('google-analytics.com')&&/^\/(?:g\/|j\/)?collect\/?$/.test(path)) ||
+    (domain('analytics.google.com')&&/^\/(?:g\/)?collect\/?$/.test(path)) ||
+    (domain('doubleclick.net')&&/^\/(?:pagead\/|activity;)/.test(path)) ||
+    (domain('bing.com')&&/^\/action\/?$/.test(path)) ||
+    (domain('ads.linkedin.com')&&/^\/collect\/?$/.test(path)) ||
+    (domain('pinterest.com')&& /^\/(?:ct|v3)\/?$/.test(path)) ||
+    (domain('tiktok.com')&& /\/pixel(?:\/|$)/.test(path)) ||
+    (domain('quantserve.com')&& /^\/pixel\/?$/.test(path))
+  );
+}
+function isPixelDimension(raw){
+  if(raw===null||raw===undefined)return false;
+  const text=String(raw).trim().toLowerCase();
+  return /^(?:0|1|0?\.\d+|1\.0+)(?:px)?$/.test(text);
+}
+function isNonVisualBeacon(el,base){
+  if(el.tagName!=='IMG')return false;
+  const src=el.getAttribute('src');
+  if(!src)return false;
+  const style=el.style;
+  const tinyWidth=isPixelDimension(el.getAttribute('width'))||isPixelDimension(style.width);
+  const tinyHeight=isPixelDimension(el.getAttribute('height'))||isPixelDimension(style.height);
+  const tiny=tinyWidth&&tinyHeight;
+  const hidden=style.display==='none'||style.visibility==='hidden'||style.visibility==='collapse'||style.opacity==='0'||el.hasAttribute('hidden');
+  const inNoscript=Boolean(el.closest('noscript'));
+  const telemetry=isTelemetryURL(src,base);
+  return (telemetry&&(tiny||hidden||inNoscript))||(tiny&&(hidden||inNoscript));
+}
+function removeNonVisualBeacons(doc,base){
+  let removed=0;
+  for(const img of [...doc.querySelectorAll('img[src]')]){
+    if(!isNonVisualBeacon(img,base))continue;
+    img.remove();
+    removed++;
+  }
+  return removed;
+}
 function stripExecutables(doc){
   doc.querySelectorAll('script,iframe,object,embed,frame,frameset,meta[http-equiv="refresh"],link[rel="manifest"],link[rel="modulepreload"],link[rel="preconnect"],link[rel="dns-prefetch"],link[rel="preload"],link[rel="prefetch"]').forEach(el=>el.remove());
   doc.querySelectorAll('*').forEach(el=>{
@@ -51,6 +102,8 @@ export async function bundleSnapshot(markup,baseURL,options={}){
   const doc=new DOMParser().parseFromString(markup,'text/html');
   stripExecutables(doc);
   const failures=[],warnings=[],cache=new Map();
+  const removedBeacons=removeNonVisualBeacons(doc,base);
+  if(removedBeacons)warnings.push('Removed '+removedBeacons+' non-visual tracking pixel'+(removedBeacons===1?'':'s')+' from the offline document.');
   let count=0,bytes=0;
   const resource=async(raw,kind,from=base)=>{
     if(isIgnoredURL(raw))return String(raw||'');
