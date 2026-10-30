@@ -68,6 +68,10 @@ try{
   assert.match(packaged.html,/data:image\/png;base64,/);
   assert.doesNotMatch(packaged.html,/https:\/\/assets\.example\/design\.css/);
   assert.doesNotMatch(packaged.html,/<script/);
+  await page.route('https://assets.example/**',route=>{
+    const target=route.request().url();
+    return target.endsWith('.css')?route.fulfill({contentType:'text/css',body:'h1{color:#124b38}'}):route.fulfill({contentType:'image/png',body:png});
+  });
   // Server-HTML URL import, relative asset resolution and standalone download.
   await page.getByRole('button',{name:'Website URL'}).click();
   await page.locator('#urlInput').fill('https://assets.example/landing');
