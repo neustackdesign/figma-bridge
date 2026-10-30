@@ -1,0 +1,75 @@
+name: Bridge web export acceptance
+on:
+  push:
+    branches:
+      - feat/web-export-suite-2026-10-30
+    paths:
+      - index.html
+      - exporter/**
+      - api/proxy.js
+      - tests/web-export.smoke.mjs
+      - tests/animated-capture.test.mjs
+      - .github/workflows/web-export.yml
+  pull_request:
+    paths:
+      - index.html
+      - exporter/**
+      - api/proxy.js
+      - tests/web-export.smoke.mjs
+      - tests/animated-capture.test.mjs
+      - .github/workflows/web-export.yml
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  regression:
+    runs-on: ubuntu-latest
+    timeout-minutes: 18
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Install test browser and existing extension dependencies
+        run: |
+          npm install --no-audit --no-fund --no-package-lock --no-save playwright@1.56.1
+          npx playwright install --with-deps chromium
+      - name: Parse source JavaScript and build extension without modifying release artefacts
+        run: |
+          node --check api/proxy.js
+          node --check exporter/snapshot.js
+          python3 - <<'PY'
+          import re, pathlib
+          html=pathlib.Path('index.html').read_text()
+          script=re.search(r'<script type="module">([\s\S]*?)</script>',html)
+          assert script, 'Browser module was not found'
+          pathlib.Path('/tmp/bridge-browser.mjs').write_text(script.group(1))
+          PY
+          node --check /tmp/bridge-browser.mjs
+          npm run build:extension
+      - name: Exercise existing importer, capture, Figma exporter and analytics contracts
+        run: |
+          node tests/animated-capture.test.mjs
+          node tests/smart-scene-capture.test.mjs
+          node tests/capture-ux.test.mjs
+          node tests/motion-capture.test.mjs
+          node tests/exporter-smoke.mjs
+          node --test tests/analytics-consent.test.mjs tests/seo-smoke.mjs
+      - name: Start isolated Bridge static app
+        run: |
+          python3 -m http.server 3200 --bind 127.0.0.1 > /tmp/bridge-web-export.log 2>&1 &
+          for i in $(seq 1 30); do if curl -fsS http://127.0.0.1:3200/ >/dev/null; then break; fi; sleep 1; done
+      - name: Verify existing Figma conversion clipboard
+        run: node tests/clipboard-smoke.mjs
+      - name: Verify HTML, PNG, JPG, PDF and safe packaging in actual Chromium
+        run: node tests/web-export.smoke.mjs
+      - name: Attach screenshots and proof files
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: bridge-web-export-acceptance
+          path: |
+            tests/web-export-proof/
+            tests/clipboard-proof/
+          if-no-files-found: warn
+          retention-days: 14
