@@ -38,6 +38,7 @@ jobs:
         run: |
           node --check api/proxy.js
           node --check exporter/snapshot.js
+          node --check scripts/build-web.mjs
           python3 - <<'PY'
           import re, pathlib
           html=pathlib.Path('index.html').read_text()
@@ -47,6 +48,7 @@ jobs:
           PY
           node --check /tmp/bridge-browser.mjs
           npm run build:extension
+          npm run build
       - name: Exercise existing importer, capture, Figma exporter and analytics contracts
         run: |
           node tests/animated-capture.test.mjs
@@ -57,7 +59,7 @@ jobs:
           node --test tests/analytics-consent.test.mjs tests/seo-smoke.mjs
       - name: Start isolated Bridge static app
         run: |
-          python3 -m http.server 3200 --bind 127.0.0.1 > /tmp/bridge-web-export.log 2>&1 &
+          cd dist && python3 -m http.server 3200 --bind 127.0.0.1 > /tmp/bridge-web-export.log 2>&1 &
           for i in $(seq 1 30); do if curl -fsS http://127.0.0.1:3200/ >/dev/null; then break; fi; sleep 1; done
       - name: Verify existing Figma conversion clipboard
         run: node tests/clipboard-smoke.mjs
