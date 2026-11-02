@@ -1,4 +1,9 @@
 User-agent: *
 Allow: /
 Disallow: /api/
+
+User-agent: meta-webindexer
+Allow: /
+Disallow: /api/
+
 Sitemap: https://bridge.neustackstudio.com/sitemap.xml
