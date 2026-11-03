@@ -350,17 +350,50 @@ async function renderBundledPages(pages,baseUrl,label){
       if(!frame.contentDocument.querySelector('[data-bridge-visual-reference]'))throw Error('Visual layer missing for screen '+number);
       rendered.push({frame,doc:frame.contentDocument,capture:c});
     }
-    frameSpecs=rendered.map(({doc,capture},i)=>({
-      element:doc.body,doc,width:capture.width,height:capture.height,
+    // Figit's DOM walker uses the ambient window/document for computed styles
+    // and text ranges. Iframe-owned nodes produce invisible paints and wrong
+    // positions even when the layer hierarchy appears to be populated.
+    // Import each prepared body into THIS document, with every frame anchored
+    // at a common 0,0 origin. Keep this detached from the preview geometry.
+    const conversionHost=document.createElement('div');
+    conversionHost.id='bridgeConversionHost';
+    conversionHost.style.cssText='position:fixed;left:-12000px;top:0;width:'+maxWidth+'px;height:1px;overflow:visible;pointer-events:none;z-index:-9999';
+    document.body.appendChild(conversionHost);
+    const styles=document.createElement('style');
+    styles.textContent=[...new Set(captures.map(c=>c.fontCss).filter(Boolean))].join('\n');
+    conversionHost.appendChild(styles);
+    const owned=[];
+    for(let i=0;i<rendered.length;i++){
+      const {doc,capture}=rendered[i];
+      const own=document.importNode(doc.body,true);
+      own.style.cssText+=';position:absolute!important;left:0!important;top:0!important;margin:0!important;display:block!important;width:'+capture.width+'px!important;height:'+capture.height+'px!important;overflow:hidden!important;visibility:visible!important';
+      own.dataset.bridgeScreen=String(i+1);
+      conversionHost.appendChild(own);
+      owned.push(own);
+    }
+    await Promise.all(owned.flatMap(own=>[...own.querySelectorAll('img')].map(img=>img.complete?Promise.resolve():new Promise(resolve=>{img.onload=img.onerror=resolve;setTimeout(resolve,3500)}))));
+    await Promise.race([document.fonts.ready,new Promise(resolve=>setTimeout(resolve,3500))]);
+    frameSpecs=owned.map((element,i)=>({
+      element,doc:document,width:captures[i].width,height:captures[i].height,
       x:i*(maxWidth+80),y:0,name:label+' — '+String(i+1).padStart(2,'0')
     }));
+    for(let i=0;i<frameSpecs.length;i++){
+      const root=frameSpecs[i].element,rect=root.getBoundingClientRect(),pic=root.querySelector('[data-bridge-visual-reference]');
+      if(!pic?.complete||pic.naturalWidth<100||Math.abs(rect.width-frameSpecs[i].width)>2||Math.abs(rect.height-frameSpecs[i].height)>2)
+        throw Error('Screen '+(i+1)+' conversion geometry or reference image is not ready.');
+      if(root.ownerDocument!==document)throw Error('Conversion document mismatch on screen '+(i+1));
+    }
     setStatus('Encoding '+frameSpecs.length+' independently editable Figma frames…');
     const figit=await import('/vendor/figit.js');
     const encoded=await figit.createFigmaConverter({layout:'absolute'}).convert({frames:frameSpecs,canvasName:'Figma Bridge import'});
     const nodes=encoded.document?.nodeChanges||[];
     const pictures=nodes.filter(n=>n.type==='ROUNDED_RECTANGLE'&&n.fillPaints?.some(p=>p.type==='IMAGE')&&n.size?.x>=1000&&n.size?.y>=600);
     const texts=nodes.filter(n=>n.type==='TEXT').length;
-    if(pictures.length<frameSpecs.length||texts<frameSpecs.length*8)throw Error('Figma encoding omitted visible reference layers or editable text.');
+    if(pictures.length<frameSpecs.length||texts<frameSpecs.length*2){
+      const counts=nodes.reduce((acc,n)=>(acc[n.type]=(acc[n.type]||0)+1,acc),{});
+      console.error('Packaged conversion output:',{counts,pictureCount:pictures.length,textCount:texts,frames:frameSpecs.length});
+      throw Error('Figma encoding incomplete ('+pictures.length+'/'+frameSpecs.length+' image references; '+texts+' editable text layers). No incomplete file was copied.');
+    }
     bundledClipboardHtml=encoded.toClipboardHtml();
     if(!bundledClipboardHtml||bundledClipboardHtml.length<5000)throw Error('Prepared Figma clipboard payload is empty.');
     mode='bundled';sourceName=label;sourceBase=baseUrl||location.href;
