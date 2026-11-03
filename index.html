@@ -310,6 +310,15 @@ async function renderBundledPages(pages,baseUrl,label){
         '<body style="'+baseStyle+';margin:0!important;width:'+c.width+'px!important;height:'+c.height+'px!important;min-height:0!important;overflow:hidden!important;">'+c.body+'</body></html>';
       setStatus('Rendering visual reference '+number+' of '+captures.length+'…');
       const rasterCanvas=await renderSnapshotCanvas(html,c.width,c.height);
+      const context=rasterCanvas.getContext('2d',{willReadFrequently:true});
+      if(!context)throw Error('Visual-reference canvas unavailable for screen '+number);
+      const pixels=context.getImageData(0,0,c.width,c.height).data;
+      let nonWhite=0;
+      for(let y=10;y<c.height;y+=24)for(let x=10;x<c.width;x+=24){
+        const k=(y*c.width+x)*4;
+        if(Math.min(pixels[k],pixels[k+1],pixels[k+2])<220)nonWhite++;
+      }
+      if(nonWhite<30)throw Error('Screen '+number+' visual capture appears blank; refusing to copy an empty frame.');
       const image=rasterCanvas.toDataURL('image/png');
       if(image.length<1500)throw Error('Visual reference '+number+' is unexpectedly empty.');
       const doc=new DOMParser().parseFromString(html,'text/html');
@@ -696,7 +705,13 @@ exportBtn.addEventListener('click',async()=>{
 
 function setupDrop(drop,input){['dragenter','dragover'].forEach(ev=>drop.addEventListener(ev,e=>{e.preventDefault();drop.classList.add('drag')}));['dragleave','drop'].forEach(ev=>drop.addEventListener(ev,e=>{e.preventDefault();drop.classList.remove('drag')}));drop.addEventListener('drop',e=>{const f=e.dataTransfer.files?.[0];if(f){const dt=new DataTransfer();dt.items.add(f);input.files=dt.files;input.dispatchEvent(new Event('change'))}})}
 setupDrop($('#htmlDrop'),$('#htmlInput'));setupDrop($('#pdfDrop'),$('#pdfInput'));
-copyBtn.addEventListener('click',async()=>{const conversionMode=mode||'unknown';measure('bridge_copy_start',{mode:conversionMode});try{copyBtn.disabled=true;if(mode==='scripted-dom'){if(!scriptedClipboardHtml)throw new Error('The scripted page has not finished preparing yet.');await navigator.clipboard.write([new ClipboardItem({'text/html':new Blob([scriptedClipboardHtml],{type:'text/html'})})]);setStatus('Copied. Paste directly into Figma with ⌘V / Ctrl+V.',false,true);measure('bridge_copy_success',{mode:conversionMode});return}if(!frameSpecs.length)return;setStatus('Encoding native Figma clipboard data…');const c=mode==='bundled'?await (async()=>{const mod=await import('/vendor/figit.js');return mod.createFigmaConverter({layout:'absolute'})})():await getConverter();let result;if(frameSpecs.length===1&&mode==='dom'){const spec=frameSpecs[0];normalizeCapture(spec.doc);await new Promise(r=>requestAnimationFrame(()=>requestAnimationFrame(r)));result=await c.convert({element:spec.element,width:spec.width,height:spec.height,name:spec.name})}else result=await c.convert({frames:frameSpecs,canvasName:mode==='pdf'?'PDF import':'Figma Bridge import'});await navigator.clipboard.write([result.toClipboardItem()]);setStatus('Copied. Paste directly into Figma with ⌘V / Ctrl+V.',false,true);measure('bridge_copy_success',{mode:conversionMode})}catch(err){console.error(err);measure('bridge_copy_error',{mode:conversionMode});setStatus('Conversion failed: '+(err.message||String(err)),true)}finally{if(mode!=='scripted-dom'||scriptedClipboardHtml)copyBtn.disabled=false}});
+copyBtn.addEventListener('click',async()=>{const conversionMode=mode||'unknown';measure('bridge_copy_start',{mode:conversionMode});try{copyBtn.disabled=true;if(mode==='scripted-dom'){if(!scriptedClipboardHtml)throw new Error('The scripted page has not finished preparing yet.');await navigator.clipboard.write([new ClipboardItem({'text/html':new Blob([scriptedClipboardHtml],{type:'text/html'})})]);setStatus('Copied. Paste directly into Figma with ⌘V / Ctrl+V.',false,true);measure('bridge_copy_success',{mode:conversionMode});return}if(!frameSpecs.length)return;setStatus('Encoding native Figma clipboard data…');const c=mode==='bundled'?await (async()=>{const mod=await import('/vendor/figit.js');return mod.createFigmaConverter({layout:'absolute'})})():await getConverter();let result;if(frameSpecs.length===1&&mode==='dom'){const spec=frameSpecs[0];normalizeCapture(spec.doc);await new Promise(r=>requestAnimationFrame(()=>requestAnimationFrame(r)));result=await c.convert({element:spec.element,width:spec.width,height:spec.height,name:spec.name})}else result=await c.convert({frames:frameSpecs,canvasName:mode==='pdf'?'PDF import':'Figma Bridge import'});if(mode==='bundled'){
+  const nodes=result.document?.nodeChanges||[];
+  const pictures=nodes.filter(n=>n.type==='ROUNDED_RECTANGLE'&&n.fillPaints?.some(p=>p.type==='IMAGE')&&n.size?.x>=1000&&n.size?.y>=600);
+  if(pictures.length<frameSpecs.length)throw Error('Figma encoding omitted one or more visual-reference layers. No incomplete payload was copied.');
+  const textNodes=nodes.filter(n=>n.type==='TEXT').length;
+  if(textNodes<frameSpecs.length*8)throw Error('Figma encoding omitted editable text. No incomplete payload was copied.');
+}await navigator.clipboard.write([result.toClipboardItem()]);setStatus('Copied '+frameSpecs.length+' screen frames with editable layers and raster visual references. Paste directly into Figma.',false,true);measure('bridge_copy_success',{mode:conversionMode})}catch(err){console.error(err);measure('bridge_copy_error',{mode:conversionMode});setStatus('Conversion failed: '+(err.message||String(err)),true)}finally{if(mode!=='scripted-dom'||scriptedClipboardHtml)copyBtn.disabled=false}});
 </script>
 <script>document.querySelectorAll('a[href="./plugin/"]').forEach(a=>a.addEventListener('click',()=>window.bridgeTrack?.('bridge_exporter_click',{source:'web'})))</script>
 </body>
