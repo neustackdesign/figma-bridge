@@ -27,6 +27,8 @@ const out=path.resolve('tests/clipboard-proof');await fs.mkdir(out,{recursive:tr
 const browser=await chromium.launch({headless:true,args:['--no-sandbox']});
 const page=await browser.newPage({viewport:{width:1512,height:1000},permissions:['clipboard-read','clipboard-write']});
 const browserErrors=[];
+const consoleErrors=[];
+page.on('console',msg=>{if(msg.type()==='error')consoleErrors.push(msg.text().slice(0,500));});
 page.on('pageerror',error=>browserErrors.push(error.message));
 await page.addInitScript(()=>{
   window.__figmaClipboard=[];
@@ -64,9 +66,9 @@ try{
   assert.ok(result.some(x=>x.type==='text/html'&&x.bytes>6000),'Figma clipboard payload missing or undersized');
   assert.equal(browserErrors.filter(x=>/ReferenceError|capture is not defined/.test(x)).length,0,'Unhandled JavaScript ReferenceError');
   await page.screenshot({path:path.join(out,'packaged-import-ready.png')});
-  console.log(JSON.stringify({passed:true,frames:4,clipboard:result,status,browserErrors},null,2));
+  console.log(JSON.stringify({passed:true,frames:4,clipboard:result,status,browserErrors,consoleErrors},null,2));
 }catch(error){
   await page.screenshot({path:path.join(out,'packaged-import-failed.png')}).catch(()=>{});
-  console.error(JSON.stringify({passed:false,error:String(error),status:await page.locator('#status').innerText().catch(()=>''),browserErrors},null,2));
+  console.error(JSON.stringify({passed:false,error:String(error),status:await page.locator('#status').innerText().catch(()=>''),browserErrors,consoleErrors},null,2));
   process.exitCode=1;
 }finally{await browser.close();}

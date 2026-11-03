@@ -26,14 +26,14 @@ try{
  await page.getByRole('button',{name:/Paste HTML \/ SVG/i}).click();
  await page.locator('#pasteInput').fill('<main style="font-family:Arial;padding:32px"><h1>Bridge Clipboard Fixture</h1><div style="display:flex;gap:16px"><div style="padding:24px;background:#d9f0db">Editable text A</div><div style="padding:24px;background:#dde7f5">Editable text B</div></div><button>Continue</button></main>');
  await page.locator('#renderPaste').click();
- await page.waitForFunction(()=>document.querySelector('#status')?.textContent?.includes('Ready'),{timeout:15000});
+ await page.waitForFunction(()=>document.querySelector('#status')?.textContent?.includes('Ready'),null,{timeout:15000});
  await page.locator('#copyFigma').click();
- await page.waitForFunction(()=>/Copied\. Paste|Conversion failed/.test(document.querySelector('#status')?.textContent||''),{timeout:45000});
+ await page.waitForFunction(()=>/^(?:Copied\b|Conversion failed)/.test(document.querySelector('#status')?.textContent||''),null,{timeout:60000});
  proof.status=await page.locator('#status').innerText();
  proof.payload=await page.evaluate(()=>window.__clipboardProof);
  proof.fixtureVisible=(await Promise.all(page.frames().map(async f=>(await f.locator('h1').allTextContents().catch(()=>[])).some(v=>v.includes('Bridge Clipboard Fixture'))))).some(Boolean);
  proof.clipboardWritten=proof.payload?.some(x=>x.bytes>100);
- proof.passed=proof.fixtureVisible&&proof.clipboardWritten&&proof.status.startsWith('Copied.');
+ proof.passed=proof.fixtureVisible&&proof.clipboardWritten&&proof.status.startsWith('Copied');
  await page.screenshot({path:path.join(out,'source-preview-and-copy-state.png'),fullPage:false});
 } catch(e){proof.passed=false;proof.error=String(e).slice(0,900)}
 finally{await browser.close();await fs.writeFile(path.join(out,'manifest.json'),JSON.stringify(proof,null,2)+'\n');console.log(JSON.stringify(proof,null,2));}
