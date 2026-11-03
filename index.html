@@ -288,26 +288,80 @@ async function captureEmbeddedPage(html,baseUrl,label){
 async function renderBundledPages(pages,baseUrl,label){
   reset();
   setStatus('Unpacking '+pages.length+' independent screens…');
-  const captures=[];
+  const captures=[],rendered=[];
+  let holder=null;
   try{
     for(let i=0;i<pages.length;i++){
       setStatus('Rendering packaged screen '+(i+1)+' of '+pages.length+'…');
-      captures.push(await captureEmbeddedPage(pages[i],baseUrl,label+' — screen '+(i+1)));
+      const capture=await captureEmbeddedPage(pages[i],baseUrl,label+' — screen '+(i+1));
+      if(capture.width<100||capture.height<100||capture.width>8192||capture.height>8192)throw Error('Invalid packaged screen dimensions.');
+      captures.push(capture);
     }
-    const fonts=[...new Set(captures.map(c=>c.fontCss).filter(Boolean))].join('\n');
-    const sections=captures.map((c,i)=>'<section class="bridge-bundle-screen" data-screen="'+i+'" style="position:relative;contain:layout paint style;overflow:hidden;width:'+c.width+'px;height:'+c.height+'px;'+c.bodyStyle+'">'+c.body+'</section>').join('\n');
-    const flat='<!doctype html><html><head><meta charset="utf-8"><title>Bridge imported screens</title><style>'+fonts.replace(/<\/style/gi,'<\\/style')+'</style></head><body style="margin:0;background:#eeece8;display:flex;flex-direction:column;gap:70px;align-items:flex-start;">'+sections+'</body></html>';
-    await renderStaticMarkup(flat,baseUrl,label,'bundled_html');
-    if(mode!=='dom'||!frameSpecs.length)throw Error('The flattened HTML failed to load.');
-    const doc=frameSpecs[0].doc;
-    const els=[...doc.querySelectorAll('.bridge-bundle-screen')];
-    if(els.length!==captures.length)throw Error('Some screens were lost while assembling the import.');
-    frameSpecs=els.map((el,i)=>({element:el,width:captures[i].width,height:captures[i].height,x:i*(Math.max(...captures.map(c=>c.width))+80),y:0,name:label+' — '+String(i+1).padStart(2,'0')}));
-    setStatus('Ready: '+els.length+' reconstructed, individually editable screens. Copy to Figma to paste all frames.',false,true);
-    measure('bridge_import_ready',{source:'bundled_html',page_count:els.length});
-  }catch(err){reset();setStatus('Packaged HTML import failed: '+(err.message||String(err)),true);measure('bridge_import_error',{source:'bundled_html'});}
+    holder=document.createElement('div');
+    holder.id='bridgeBundledScreens';
+    holder.style.cssText='position:relative;width:1440px;display:flex;flex-direction:column;gap:20px;align-items:flex-start';
+    stage.appendChild(holder);
+    const maxWidth=Math.max(...captures.map(c=>c.width));
+    for(let i=0;i<captures.length;i++){
+      const c=captures[i],number=String(i+1).padStart(2,'0');
+      const baseStyle=String(c.bodyStyle||'').replace(/"/g,'&quot;');
+      const safeFonts=String(c.fontCss||'').replace(/<\/style/gi,'<\\/style');
+      const html='<!doctype html><html><head><meta charset="utf-8"><style>'+safeFonts+'</style></head>'+
+        '<body style="'+baseStyle+';margin:0!important;width:'+c.width+'px!important;height:'+c.height+'px!important;min-height:0!important;overflow:hidden!important;">'+c.body+'</body></html>';
+      setStatus('Rendering visual reference '+number+' of '+captures.length+'…');
+      const rasterCanvas=await renderSnapshotCanvas(html,c.width,c.height);
+      const image=rasterCanvas.toDataURL('image/png');
+      if(image.length<1500)throw Error('Visual reference '+number+' is unexpectedly empty.');
+      const doc=new DOMParser().parseFromString(html,'text/html');
+      const body=doc.body,existing=body.innerHTML;
+      const reference=doc.createElement('img');
+      reference.src=image;
+      reference.alt='Visual reference — screen '+number;
+      reference.setAttribute('data-bridge-visual-reference','true');
+      reference.style.cssText='display:block;position:absolute;left:0;top:0;width:'+c.width+'px;height:'+c.height+'px;object-fit:fill;z-index:0;pointer-events:none';
+      const overlay=doc.createElement('div');
+      overlay.style.cssText='position:absolute;left:0;top:0;width:'+c.width+'px;height:'+c.height+'px;z-index:1';
+      overlay.innerHTML=existing;
+      body.replaceChildren(reference,overlay);
+      body.style.position='relative';
+      body.style.display='block';
+      const screenHtml='<!doctype html>'+doc.documentElement.outerHTML;
+      const frame=document.createElement('iframe');
+      frame.setAttribute('sandbox','allow-same-origin');
+      frame.setAttribute('aria-label',label+' — screen '+number);
+      frame.style.cssText='display:block;flex:none;width:'+c.width+'px;height:'+c.height+'px;border:1px solid #d4d0c9;background:white';
+      holder.appendChild(frame);
+      const loaded=waitForStaticFrame(frame);
+      frame.srcdoc=screenHtml;
+      await loaded;
+      if(!frame.contentDocument?.body)throw Error('Screen '+number+' could not be mounted.');
+      const imgs=[...frame.contentDocument.images];
+      await Promise.all(imgs.map(img=>img.complete?Promise.resolve():new Promise(r=>{img.onload=img.onerror=r;setTimeout(r,3000)})));
+      if(!frame.contentDocument.querySelector('[data-bridge-visual-reference]'))throw Error('Visual layer missing for screen '+number);
+      rendered.push({frame,doc:frame.contentDocument,capture});
+    }
+    frameSpecs=rendered.map(({doc,capture},i)=>({
+      element:doc.body,doc,width:capture.width,height:capture.height,
+      x:i*(maxWidth+80),y:0,name:label+' — '+String(i+1).padStart(2,'0')
+    }));
+    mode='bundled';sourceName=label;sourceBase=baseUrl||location.href;
+    const scale=Math.min(1,Math.max(.15,(previewWrap.clientWidth-60)/maxWidth));
+    holder.style.transformOrigin='top left';
+    holder.style.transform='scale('+scale+')';
+    stage.style.width=(maxWidth*scale)+'px';
+    stage.style.height=((captures.reduce((n,c)=>n+c.height,0)+(captures.length-1)*20)*scale)+'px';
+    empty.style.display='none';
+    stage.classList.add('ready');
+    copyBtn.disabled=false;
+    setExportReady(false);
+    setStatus('Ready: '+frameSpecs.length+' editable screen frames, each with an independent visual-reference layer. Copy to Figma.',false,true);
+    measure('bridge_import_ready',{source:'bundled_html',page_count:frameSpecs.length,visual_reference_pages:rendered.length});
+  }catch(err){
+    reset();
+    setStatus('Packaged HTML import failed: '+(err.message||String(err)),true);
+    measure('bridge_import_error',{source:'bundled_html'});
+  }
 }
-
 async function readMarkupFile(file,baseUrl=''){if(!file)return;try{const header=await file.slice(0,8).text();if(header.startsWith('%PDF-')||/\.pdf$/i.test(file.name)||file.type==='application/pdf'){document.querySelector('[data-pane="pdf"]').click();return await renderPdf(file)}const text=await file.text(),isSvg=file.type.includes('svg')||/\.svg$/i.test(file.name),label=file.name.replace(/\.[^.]+$/,'');const markup=isSvg?`<!doctype html><html><body style="margin:0;display:inline-block">${text}</body></html>`:text;if(!isSvg){const pages=await unpackEmbeddedPages(markup);if(pages)return await renderBundledPages(pages,baseUrl,label)}if(!isSvg&&containsExecutableScript(markup))await renderScriptedMarkup(markup,baseUrl,label);else await renderStaticMarkup(markup,baseUrl,label)}catch(err){setStatus('Import failed: '+(err.message||String(err)),true);measure('bridge_import_error',{source:'file'})}}
 $('#htmlInput').addEventListener('change',e=>readMarkupFile(e.target.files[0],$('#baseUrl').value.trim()));
 $('#renderPaste').addEventListener('click',()=>{const text=$('#pasteInput').value.trim();if(!text)return setStatus('Paste HTML or SVG first.',true);containsExecutableScript(text)?renderScriptedMarkup(text,$('#pasteBase').value.trim(),'Pasted design'):renderStaticMarkup(text,$('#pasteBase').value.trim(),'Pasted design')});
@@ -642,7 +696,7 @@ exportBtn.addEventListener('click',async()=>{
 
 function setupDrop(drop,input){['dragenter','dragover'].forEach(ev=>drop.addEventListener(ev,e=>{e.preventDefault();drop.classList.add('drag')}));['dragleave','drop'].forEach(ev=>drop.addEventListener(ev,e=>{e.preventDefault();drop.classList.remove('drag')}));drop.addEventListener('drop',e=>{const f=e.dataTransfer.files?.[0];if(f){const dt=new DataTransfer();dt.items.add(f);input.files=dt.files;input.dispatchEvent(new Event('change'))}})}
 setupDrop($('#htmlDrop'),$('#htmlInput'));setupDrop($('#pdfDrop'),$('#pdfInput'));
-copyBtn.addEventListener('click',async()=>{const conversionMode=mode||'unknown';measure('bridge_copy_start',{mode:conversionMode});try{copyBtn.disabled=true;if(mode==='scripted-dom'){if(!scriptedClipboardHtml)throw new Error('The scripted page has not finished preparing yet.');await navigator.clipboard.write([new ClipboardItem({'text/html':new Blob([scriptedClipboardHtml],{type:'text/html'})})]);setStatus('Copied. Paste directly into Figma with ⌘V / Ctrl+V.',false,true);measure('bridge_copy_success',{mode:conversionMode});return}if(!frameSpecs.length)return;setStatus('Encoding native Figma clipboard data…');const c=await getConverter();let result;if(frameSpecs.length===1&&mode==='dom'){const spec=frameSpecs[0];normalizeCapture(spec.doc);await new Promise(r=>requestAnimationFrame(()=>requestAnimationFrame(r)));result=await c.convert({element:spec.element,width:spec.width,height:spec.height,name:spec.name})}else result=await c.convert({frames:frameSpecs,canvasName:mode==='pdf'?'PDF import':'Figma Bridge import'});await navigator.clipboard.write([result.toClipboardItem()]);setStatus('Copied. Paste directly into Figma with ⌘V / Ctrl+V.',false,true);measure('bridge_copy_success',{mode:conversionMode})}catch(err){console.error(err);measure('bridge_copy_error',{mode:conversionMode});setStatus('Conversion failed: '+(err.message||String(err)),true)}finally{if(mode!=='scripted-dom'||scriptedClipboardHtml)copyBtn.disabled=false}});
+copyBtn.addEventListener('click',async()=>{const conversionMode=mode||'unknown';measure('bridge_copy_start',{mode:conversionMode});try{copyBtn.disabled=true;if(mode==='scripted-dom'){if(!scriptedClipboardHtml)throw new Error('The scripted page has not finished preparing yet.');await navigator.clipboard.write([new ClipboardItem({'text/html':new Blob([scriptedClipboardHtml],{type:'text/html'})})]);setStatus('Copied. Paste directly into Figma with ⌘V / Ctrl+V.',false,true);measure('bridge_copy_success',{mode:conversionMode});return}if(!frameSpecs.length)return;setStatus('Encoding native Figma clipboard data…');const c=mode==='bundled'?await (async()=>{const mod=await import('/vendor/figit.js');return mod.createFigmaConverter({layout:'absolute'})})():await getConverter();let result;if(frameSpecs.length===1&&mode==='dom'){const spec=frameSpecs[0];normalizeCapture(spec.doc);await new Promise(r=>requestAnimationFrame(()=>requestAnimationFrame(r)));result=await c.convert({element:spec.element,width:spec.width,height:spec.height,name:spec.name})}else result=await c.convert({frames:frameSpecs,canvasName:mode==='pdf'?'PDF import':'Figma Bridge import'});await navigator.clipboard.write([result.toClipboardItem()]);setStatus('Copied. Paste directly into Figma with ⌘V / Ctrl+V.',false,true);measure('bridge_copy_success',{mode:conversionMode})}catch(err){console.error(err);measure('bridge_copy_error',{mode:conversionMode});setStatus('Conversion failed: '+(err.message||String(err)),true)}finally{if(mode!=='scripted-dom'||scriptedClipboardHtml)copyBtn.disabled=false}});
 </script>
 <script>document.querySelectorAll('a[href="./plugin/"]').forEach(a=>a.addEventListener('click',()=>window.bridgeTrack?.('bridge_exporter_click',{source:'web'})))</script>
 </body>
