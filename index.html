@@ -348,7 +348,7 @@ async function renderBundledPages(pages,baseUrl,label){
       const imgs=[...frame.contentDocument.images];
       await Promise.all(imgs.map(img=>img.complete?Promise.resolve():new Promise(r=>{img.onload=img.onerror=r;setTimeout(r,3000)})));
       if(!frame.contentDocument.querySelector('[data-bridge-visual-reference]'))throw Error('Visual layer missing for screen '+number);
-      rendered.push({frame,doc:frame.contentDocument,capture});
+      rendered.push({frame,doc:frame.contentDocument,capture:c});
     }
     frameSpecs=rendered.map(({doc,capture},i)=>({
       element:doc.body,doc,width:capture.width,height:capture.height,
