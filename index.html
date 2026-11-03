@@ -210,14 +210,14 @@ const exportBtn=$('#exportBtn'),exportFormat=$('#exportFormat'),exportNote=$('#e
 const CAPTURE_W=1440,CAPTURE_H=900;
 const measure=(event,props={})=>window.bridgeTrack?.(event,props);
 let mode=null,frameSpecs=[],figmaConverter=null,scriptedFrame=null,scriptedToken=null,scriptedClipboardHtml=null,scriptedPreparing=false,scriptedLastSignature='',scriptedStableCount=0,currentPreviewFrame=null;
-let sourceBase=location.href,sourceName='bridge-export',pdfSourceFile=null,scriptedSnapshotResolve=null,scriptedSnapshotReject=null;
+let sourceBase=location.href,sourceName='bridge-export',pdfSourceFile=null,bundledExportHtml=null,scriptedSnapshotResolve=null,scriptedSnapshotReject=null;
 function setExportReady(ready){document.querySelectorAll('[data-export-kind]').forEach(button=>button.disabled=!ready);exportBtn.disabled=!ready;exportFormat.disabled=!ready;exportNote.textContent=ready?'Export a static offline HTML document, or download a PNG, JPG or PDF. Source scripts are not included.':'Select a source to enable export. Web images and PDFs use the static page snapshot; the extension handles live animation and Canvas.';}
 function safeName(name){return String(name||'bridge-export').replace(/[^a-z0-9._-]+/gi,'-').replace(/^-+|-+$/g,'').slice(0,75)||'bridge-export';}
 function setStatus(message,error=false,ok=false){status.textContent=message;status.className='status'+(error?' error':ok?' ok':'')}
 function fitPreview(){if(!currentPreviewFrame)return;const available=Math.max(240,previewWrap.clientWidth-36);const scale=Math.min(1,available/CAPTURE_W);currentPreviewFrame.style.transform=`scale(${scale})`;stage.style.width=(CAPTURE_W*scale)+'px';stage.style.height=(CAPTURE_H*scale)+'px'}
 function mountPreview(frame){currentPreviewFrame=frame;frame.className='preview-frame';frame.style.width=CAPTURE_W+'px';frame.style.height=CAPTURE_H+'px';stage.appendChild(frame);empty.style.display='none';stage.classList.add('ready');requestAnimationFrame(fitPreview)}
 window.addEventListener('resize',fitPreview);
-function reset(){if(scriptedSnapshotReject){scriptedSnapshotReject(new Error('Source was cleared during export.'));scriptedSnapshotResolve=null;scriptedSnapshotReject=null;}mode=null;frameSpecs=[];scriptedFrame=null;scriptedToken=null;scriptedClipboardHtml=null;scriptedPreparing=false;scriptedLastSignature='';scriptedStableCount=0;currentPreviewFrame=null;sourceBase=location.href;sourceName='bridge-export';pdfSourceFile=null;stage.innerHTML='';stage.style.width='';stage.style.height='';stage.classList.remove('ready');empty.style.display='grid';copyBtn.disabled=true;setExportReady(false);setStatus('Load something to begin.')}
+function reset(){if(scriptedSnapshotReject){scriptedSnapshotReject(new Error('Source was cleared during export.'));scriptedSnapshotResolve=null;scriptedSnapshotReject=null;}mode=null;frameSpecs=[];scriptedFrame=null;scriptedToken=null;scriptedClipboardHtml=null;scriptedPreparing=false;scriptedLastSignature='';scriptedStableCount=0;currentPreviewFrame=null;sourceBase=location.href;sourceName='bridge-export';pdfSourceFile=null;bundledExportHtml=null;stage.innerHTML='';stage.style.width='';stage.style.height='';stage.classList.remove('ready');empty.style.display='grid';copyBtn.disabled=true;setExportReady(false);setStatus('Load something to begin.')}
 document.querySelectorAll('.tab').forEach(tab=>tab.addEventListener('click',()=>{document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));document.querySelectorAll('.pane').forEach(p=>p.classList.remove('active'));tab.classList.add('active');$('#'+tab.dataset.pane).classList.add('active')}));$('#clearBtn').addEventListener('click',reset);
 async function getConverter(){if(figmaConverter)return figmaConverter;setStatus('Loading the Figma conversion engine…');const mod=await import('/vendor/figit.js');const imageLoader=async({src})=>{try{const r=await fetch(src,{mode:'cors'});if(!r.ok)throw new Error('direct image fetch failed');const b=await r.blob();return{bytes:await b.arrayBuffer(),mimeType:b.type||'image/png'}}catch{const r=await fetch('/api/proxy?mode=asset&url='+encodeURIComponent(src));if(!r.ok)throw new Error('asset proxy failed');const b=await r.blob();return{bytes:await b.arrayBuffer(),mimeType:b.type||'image/png'}}};figmaConverter=mod.createFigmaConverter({layout:'auto',imageLoader});return figmaConverter}
 function injectBase(markup,baseUrl){if(!baseUrl)return markup;const tag=`<base href="${baseUrl.replace(/"/g,'&quot;')}">`;if(/<head[\s>]/i.test(markup))return markup.replace(/<head([^>]*)>/i,`<head$1>${tag}`);return `<!doctype html><html><head>${tag}</head><body>${markup}</body></html>`}
@@ -288,7 +288,7 @@ async function captureEmbeddedPage(html,baseUrl,label){
 async function renderBundledPages(pages,baseUrl,label){
   reset();
   setStatus('Unpacking '+pages.length+' independent screens…');
-  const captures=[],rendered=[];
+  const captures=[],rendered=[],referenceImages=[];
   let holder=null;
   try{
     for(let i=0;i<pages.length;i++){
@@ -320,6 +320,7 @@ async function renderBundledPages(pages,baseUrl,label){
       }
       if(nonWhite<30)throw Error('Screen '+number+' visual capture appears blank; refusing to copy an empty frame.');
       const image=rasterCanvas.toDataURL('image/png');
+      referenceImages.push(image);
       if(image.length<1500)throw Error('Visual reference '+number+' is unexpectedly empty.');
       const doc=new DOMParser().parseFromString(html,'text/html');
       const body=doc.body,existing=body.innerHTML;
@@ -354,6 +355,8 @@ async function renderBundledPages(pages,baseUrl,label){
       x:i*(maxWidth+80),y:0,name:label+' — '+String(i+1).padStart(2,'0')
     }));
     mode='bundled';sourceName=label;sourceBase=baseUrl||location.href;
+    bundledExportHtml='<!doctype html><html><head><meta charset="utf-8"><title>'+label.replace(/</g,'&lt;')+'</title></head><body style="margin:0;background:#f4f2ee;display:flex;flex-direction:column;gap:20px;align-items:flex-start">'+
+      referenceImages.map((src,i)=>'<img alt="Screen '+(i+1)+'" src="'+src+'" style="display:block;width:'+captures[i].width+'px;height:'+captures[i].height+'px">').join('')+'</body></html>';
     const scale=Math.min(1,Math.max(.15,(previewWrap.clientWidth-60)/maxWidth));
     holder.style.transformOrigin='top left';
     holder.style.transform='scale('+scale+')';
@@ -362,7 +365,7 @@ async function renderBundledPages(pages,baseUrl,label){
     empty.style.display='none';
     stage.classList.add('ready');
     copyBtn.disabled=false;
-    setExportReady(false);
+    setExportReady(true);
     setStatus('Ready: '+frameSpecs.length+' editable screen frames, each with an independent visual-reference layer. Copy to Figma.',false,true);
     measure('bridge_import_ready',{source:'bundled_html',page_count:frameSpecs.length,visual_reference_pages:rendered.length});
   }catch(err){
@@ -620,6 +623,12 @@ async function renderPdf(file){
 }
 $('#pdfInput').addEventListener('change',e=>renderPdf(e.target.files[0]));
 async function getExportSnapshot(){
+  if(mode==='bundled'){
+    if(!bundledExportHtml)throw new Error('Bundled screen export has not completed.');
+    const width=Math.max(...frameSpecs.map(f=>f.width));
+    const height=frameSpecs.reduce((sum,f)=>sum+f.height,0)+(frameSpecs.length-1)*20;
+    return {markup:bundledExportHtml,base:sourceBase,width,height};
+  }
   if(mode==='dom'){
     const spec=frameSpecs[0];
     if(!spec?.doc)throw new Error('The preview is not ready.');
