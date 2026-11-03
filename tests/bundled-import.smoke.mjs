@@ -49,7 +49,7 @@ try{
   await page.waitForFunction(()=>{
     const status=document.querySelector('#status')?.textContent||'';
     return status.includes('Ready: 4 editable screen frames') || /import failed|Conversion failed/i.test(status);
-  },{timeout:180000});
+  },null,{timeout:180000});
   const status=await page.locator('#status').innerText();
   assert.match(status,/Ready: 4 editable screen frames/, 'The real bundled HTML path failed: '+status);
   assert.equal(await page.locator('#copyFigma').isEnabled(),true);
