@@ -1,9 +1,24 @@
-import { build } from 'esbuild';
-import { cp, mkdir, rm, access } from 'node:fs/promises';
+import { build, transform } from 'esbuild';
+import { runInNewContext } from 'node:vm';
+import { cp, mkdir, rm, access, readFile } from 'node:fs/promises';
 import path from 'node:path';
 
 const root=process.cwd();
 const dist=path.join(root,'dist');
+
+const html=await readFile(path.join(root,'index.html'),'utf8');
+const mainScript=html.match(/<script\s+type="module"\s*>([\s\S]*?)<\/script>/i);
+if(!mainScript)throw new Error('Bridge inline module script was not found.');
+await transform(mainScript[1],{loader:'js',format:'esm',target:'es2022'});
+const start=mainScript[1].indexOf('function makeBridgeScript('),end=mainScript[1].indexOf('function injectBridge(',start);
+if(start<0||end<0)throw new Error('The sandbox bootstrap could not be found.');
+const makeBridgeScript=runInNewContext(mainScript[1].slice(start,end)+'\nmakeBridgeScript',{location:{origin:'https://bridge.example.com'}});
+const bootstrap=makeBridgeScript('validation-token','Validation screen');
+const js=bootstrap.slice(bootstrap.indexOf('>')+1,bootstrap.lastIndexOf('</script>'));
+if(!js.trim())throw new Error('Generated sandbox bootstrap is empty.');
+await transform(js,{loader:'js',target:'es2022'});
+console.log('Verified page module and generated sandbox bootstrap syntax.');
+
 await rm(dist,{recursive:true,force:true});
 await mkdir(path.join(dist,'vendor'),{recursive:true});
 for(const item of ['index.html','analytics.js','icon.svg','robots.txt','sitemap.xml','plugin','extension','exporter']){
