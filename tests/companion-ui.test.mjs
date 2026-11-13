@@ -5,7 +5,7 @@ import {chromium} from 'playwright';
 const html=readFileSync('extension/popup.html','utf8');
 const js=readFileSync('extension/popup.js','utf8');
 const manifest=JSON.parse(readFileSync('extension/manifest.json','utf8'));
-assert.equal(manifest.version,'0.3.4');
+assert.equal(manifest.version,'0.3.5');
 for(const name of ['design','images','motion']){
   assert.match(html,new RegExp('id="tab-'+name+'"'));
   assert.match(html,new RegExp('id="panel-'+name+'"'));
@@ -20,12 +20,12 @@ try{
   await page.setContent(html.replace('<script src="popup.js"></script>',''));
   await page.evaluate(()=>{
     window.chrome={
-      runtime:{getManifest:()=>({version:'0.3.4'}),sendMessage:async()=>({ok:true,phase:'idle'})},
+      runtime:{getManifest:()=>({version:'0.3.5'}),sendMessage:async()=>({ok:true,phase:'idle'})},
       tabs:{query:async()=>[{id:1,url:'https://chowdeck.com/'}]}
     };
   });
   await page.addScriptTag({content:js});
-  assert.equal(await page.locator('#buildVersion').textContent(),'v0.3.4');
+  assert.equal(await page.locator('#buildVersion').textContent(),'v0.3.5');
   await page.waitForFunction(()=>document.querySelector('#tabSite').textContent==='chowdeck.com');
   assert.equal(await page.locator('#tab-design').getAttribute('aria-selected'),'true');
   assert.equal(await page.locator('#panel-design').isVisible(),true);
