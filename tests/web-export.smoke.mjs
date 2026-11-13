@@ -104,7 +104,7 @@ try{
   await page.getByRole('button',{name:'Website URL'}).click();
   await page.locator('#urlInput').fill('https://assets.example/landing');
   await page.locator('#loadUrl').click();
-  await page.waitForFunction(()=>document.querySelector('#status')?.textContent?.startsWith('Ready:'),{timeout:20000});
+  await page.waitForFunction(()=>document.querySelector('#status')?.textContent?.startsWith('Static preview:'),{timeout:20000});
   const importedHTML=String(await download('html'));
   assert.match(importedHTML,/Imported URL proof/);
   assert.match(importedHTML,/data:image\/png;base64,/);

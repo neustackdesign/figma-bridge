@@ -9,6 +9,7 @@ on:
       - exporter/**
       - api/proxy.js
       - tests/web-export.smoke.mjs
+      - tests/url-import.smoke.mjs
       - tests/bundled-import.smoke.mjs
       - tests/animated-capture.test.mjs
       - tests/live-dom-snapshot.test.mjs
@@ -22,6 +23,7 @@ on:
       - exporter/**
       - api/proxy.js
       - tests/web-export.smoke.mjs
+      - tests/url-import.smoke.mjs
       - tests/bundled-import.smoke.mjs
       - tests/animated-capture.test.mjs
       - tests/live-dom-snapshot.test.mjs
@@ -78,6 +80,8 @@ jobs:
         run: node tests/clipboard-smoke.mjs
       - name: Regress four-screen packaged HTML import and Figma payload
         run: node tests/bundled-import.smoke.mjs
+      - name: Verify public URL fetch, rendered content and truthful readiness
+        run: node tests/url-import.smoke.mjs
       - name: Verify HTML, PNG, JPG, PDF and safe packaging in actual Chromium
         run: node tests/web-export.smoke.mjs
       - name: Attach screenshots and proof files

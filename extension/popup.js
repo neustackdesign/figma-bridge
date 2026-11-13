@@ -144,11 +144,17 @@ async function primePage(tabId) {
     throw Error('The page has no measurable viewport.');
   // Use a gradual, overlapping sweep. Large jumps miss IntersectionObserver
   // reveals and async content that only mounts after sustained visibility.
-  const step=Math.max(180,Math.floor(initial.viewportHeight*.55));
-  const maxVisits=Math.min(MAX_TILES,120);
-  let y=0,visits=0,lastBottom=0;
+  const maxVisits=Math.min(MAX_TILES,65);
+  // A long, constantly expanding page must not hold the browser hostage.
+  // Keep overlapping stops on typical pages; adapt step length only for
+  // unusually tall pages, with a hard elapsed-time preparation budget.
+  const step=Math.max(180,Math.floor(initial.viewportHeight*.55),
+    Math.ceil(Math.max(0,initial.height-initial.viewportHeight)/44));
+  const started=Date.now(),maxMillis=45000;
+  let y=0,visits=0,lastBottom=0,complete=false;
   try {
-    while(visits++<maxVisits){
+    while(visits<maxVisits&&Date.now()-started<maxMillis){
+      visits++;
       const metrics=await evaluate(tabId,dimensionsScript);
       const bottom=Math.max(0,Math.min(metrics.height-metrics.viewportHeight,150000));
       const target=Math.min(y,bottom);
@@ -160,9 +166,10 @@ async function primePage(tabId) {
       if(pending>0)await wait(700);
       setStatus('Preparing animated and lazy sections… '+Math.min(100,Math.round(target/Math.max(1,bottom)*100))+'%');
       lastBottom=bottom;
-      if(target>=bottom&&y>=bottom)break;
+      if(target>=bottom&&y>=bottom){complete=true;break;}
       y+=step;
     }
+    if(!complete)setStatus('Some animated sections did not finish preparing within the 45-second safety budget. Capture will continue with a partial-page warning.');
     // Some requests start only after earlier lazy sections were visited.
     await evaluate(tabId,'Promise.race([Promise.all([document.fonts?.ready||Promise.resolve(),...Array.from(document.images).map(img=>img.complete?Promise.resolve():new Promise(resolve=>{img.addEventListener("load",resolve,{once:true});img.addEventListener("error",resolve,{once:true})}))]),new Promise(resolve=>setTimeout(resolve,5000))]).then(()=>true)',7000);
   }finally{
@@ -171,7 +178,7 @@ async function primePage(tabId) {
     await wait(550);
   }
   const finalMetrics=await evaluate(tabId,dimensionsScript);
-  return {...finalMetrics,primedSections:visits,scrollRange:lastBottom};
+  return {...finalMetrics,primedSections:visits,scrollRange:lastBottom,primePartial:!complete};
 }
 
 async function screenshot(tabId) {
@@ -376,7 +383,7 @@ async function capture(format) {
     } finally {
       setTimeout(()=>URL.revokeObjectURL(url),60000);
     }
-    setStatus(`Export ready: ${canvas.width} × ${canvas.height}px ${format==='png'?'PNG':'JPG'}.`+(scale<1?' Auto-scaled to fit browser memory limits.':''),false,true);
+    setStatus(`Export ready: ${canvas.width} × ${canvas.height}px ${format==='png'?'PNG':'JPG'}.`+(scale<1?' Auto-scaled to fit browser memory limits.':'')+(metrics.primePartial?' Page pre-scroll reached its safety budget; some lazy content may be missing.':''),false,true);
   } catch(error) {
     setStatus('Export failed: '+(error?.message||String(error)));
   } finally {
@@ -461,8 +468,8 @@ async function captureSceneFrames(){
     setStatus("Preparing the full page before scene capture…");
     // Scene capture previously skipped the priming pass used by full-page
     // screenshots, so lazy sections appeared as skeletons or empty regions.
-    original=await primePage(tabId);
-    const count=8,maxScroll=Math.max(0,original.height-original.viewportHeight);
+    const prepared=await primePage(tabId);
+    const count=8,maxScroll=Math.max(0,prepared.height-prepared.viewportHeight);
     const delta=Math.max(170,Math.min(700,Math.ceil(maxScroll/((count-1)*4))));
     await evaluate(tabId,scrollExpression(0));
     for(let i=0;i<count;i++){
@@ -494,7 +501,7 @@ async function captureSceneFrames(){
       });
       setStatus('Capturing actual animation states: '+(i+1)+'/'+count+' frames…');
     }
-    setStatus('Eight separate PNG scene frames saved. For the complete motion, use Guided scroll → MP4.',false,true);
+    setStatus('Eight separate PNG scene frames saved.'+(prepared.primePartial?' Page pre-scroll reached its safety budget; some lazy content may be missing.':'')+' For the complete motion, use Guided scroll → MP4.',false,true);
   }catch(error){
     setStatus('Scene capture failed: '+(error?.message||String(error))+' Try Guided scroll or Manual interactions as MP4.',true);
   }finally{
@@ -511,7 +518,7 @@ if(sceneFramesButton)sceneFramesButton.addEventListener('click',captureSceneFram
 /* Rendered DOM capture: Chrome executes this function on the actual tab, not in
  * the sandboxed URL importer. The document is CLONED and sanitized; live scripts
  * are never bundled or run again in the exported snapshot. */
-async function bridgeSnapshotRenderedDOM({sweep=true}={}){
+async function bridgeSnapshotRenderedDOM({sweep=true,maxSweepMs=45000}={}){
   const sleep=ms=>new Promise(resolve=>setTimeout(resolve,ms));
   const root=document.documentElement;
   const oldX=window.scrollX,oldY=window.scrollY;
@@ -522,7 +529,8 @@ async function bridgeSnapshotRenderedDOM({sweep=true}={}){
   const visibleStates=new WeakMap();
   const revealSelector='[data-reveal],[data-gsap],[data-animate],[data-animation],[data-aos],.reveal,.aos-init,[style*="opacity"]';
   const dimensions=()=>Math.max(root.scrollHeight,document.body?.scrollHeight||0,nested?.scrollHeight||0,innerHeight);
-  let observed=0,canvases=0,unsupportedCanvases=0,videos=0,repairedSections=0,collapsedSections=0;
+  let observed=0,canvases=0,unsupportedCanvases=0,videos=0,repairedSections=0,collapsedSections=0,sweepPartial=false;
+  const budget=Math.min(45000,Math.max(1000,Number(maxSweepMs)||45000));
   async function move(y){
     const smoother=window.ScrollSmoother?.get?.();
     if(smoother)smoother.scrollTop(y,false);
@@ -552,14 +560,19 @@ async function bridgeSnapshotRenderedDOM({sweep=true}={}){
   }
   try{
     if(sweep){
-      const step=Math.max(220,Math.floor(innerHeight*.55));
-      const maxSteps=Math.min(120,Math.ceil(dimensions()/step)+2);
+      const step=Math.max(220,Math.floor(innerHeight*.55),
+        Math.ceil(Math.max(0,dimensions()-innerHeight)/42));
+      const maxSteps=Math.min(65,Math.ceil(dimensions()/step)+2);
+      const deadline=Date.now()+budget;
+      let complete=false;
       for(let i=0;i<=maxSteps;i++){
+        if(Date.now()>=deadline){sweepPartial=true;break;}
         const bottom=Math.max(0,dimensions()-innerHeight);
         const target=Math.min(i*step,bottom);
         await move(target);
-        if(target>=bottom)break;
+        if(target>=bottom){complete=true;break;}
       }
+      if(!complete)sweepPartial=true;
       await move(oldY);
     }
     await Promise.race([document.fonts?.ready||Promise.resolve(),sleep(2500)]);
@@ -666,7 +679,7 @@ async function bridgeSnapshotRenderedDOM({sweep=true}={}){
     const unsettled=[...document.querySelectorAll('[aria-busy="true"],[class*="skeleton"],[class*="Skeleton"],[data-state="loading"]')]
       .filter(el=>{const r=el.getBoundingClientRect(),st=getComputedStyle(el);
         return r.width>0&&r.height>0&&st.display!=='none'&&st.visibility!=='hidden'}).length;
-    return {html,source:location.href,nodes:sourceElements.length,observed,canvases,unsupportedCanvases,videos,unsettled,repairedSections,collapsedSections};
+    return {html,source:location.href,nodes:sourceElements.length,observed,canvases,unsupportedCanvases,videos,unsettled,repairedSections,collapsedSections,sweepPartial};
   }finally{
     try{
       if(nested)nested.scrollTop=oldNested;
@@ -705,7 +718,8 @@ captureRenderedButton?.addEventListener('click',async()=>{
     const warning=(data.unsupportedCanvases?' '+data.unsupportedCanvases+' protected canvas(es) need PNG fallback.':'')
       +(data.unsettled?' '+data.unsettled+' loading placeholder(s) remained; inspect the source page or capture screenshots as a fallback.':'')
       +(data.repairedSections?' Restored '+data.repairedSections+' observed expanded section(s).':'')
-      +(data.collapsedSections?' '+data.collapsedSections+' section(s) remained collapsed and need scene/image capture.':'');
+      +(data.collapsedSections?' '+data.collapsedSections+' section(s) remained collapsed and need scene/image capture.':'')
+      +(data.sweepPartial?' Preparation reached the 45-second safety budget. Some dynamic sections may be incomplete.':'');
     setStatus('Rendered HTML download started ('+data.nodes+' DOM nodes). Import it in Bridge, then Copy to Figma.'+warning);
   }catch(error){
     setStatus('Rendered HTML capture failed: '+(error?.message||String(error)));
