@@ -530,20 +530,19 @@ async function bridgeSnapshotRenderedDOM({sweep=true}={}){
         copy.removeAttribute('sizes');
         copy.setAttribute('loading','eager');
       }
-      const state=visibleStates.get(original);
-      if(state){
-        const cs=getComputedStyle(original);
-        if(Number(cs.opacity)<.85||cs.visibility==='hidden'){
-          copy.style.setProperty('opacity','1','important');
-          copy.style.setProperty('visibility','visible','important');
-          if(state.transform&&state.transform!=='none')copy.style.setProperty('transform',state.transform,'important');
-        }
-      }
       const computed=getComputedStyle(original);
       if(computed.animationName!=='none'){
         copy.style.setProperty('transform',computed.transform,'important');
         copy.style.setProperty('opacity',computed.opacity,'important');
         copy.style.setProperty('visibility',computed.visibility,'important');
+      }
+      // A revealed element may be hidden again when scrolling to its original
+      // position. Preserve the visible state observed in the earlier sweep.
+      const state=visibleStates.get(original);
+      if(state&&(Number(computed.opacity)<.85||computed.visibility==='hidden')){
+        copy.style.setProperty('opacity','1','important');
+        copy.style.setProperty('visibility','visible','important');
+        if(state.transform&&state.transform!=='none')copy.style.setProperty('transform',state.transform,'important');
       }
     }
     // Private input values and executable page code must never be exported.
