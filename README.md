@@ -71,6 +71,19 @@ Auto Layout is inferred by `@figit/dom-to-figma` for flex, grid, wrapping and bl
 
 The browser conversion engine is the MIT-licensed [`@figit/dom-to-figma`](https://github.com/figitdesign/web-to-figma) package rather than a Neustack reimplementation.
 
+## Capture JavaScript-rendered pages for editable Figma import
+
+For pages such as Chowdeck that render content after load or use scroll-triggered reveals, use the Chrome companion's **Editable live-page capture → Download rendered HTML for Figma** action:
+
+1. Open the actual website in Chrome or Edge.
+2. Open Bridge's browser companion. Leave **Reveal lazy and scroll-triggered content first** enabled.
+3. Click **Download rendered HTML for Figma**. The companion sweeps the page, observes visible reveal states, captures accessible Canvas pixels as inline images, then restores the original scroll position.
+4. Open the downloaded `.html` in Bridge's **HTML file** tab, then **Copy to Figma**.
+
+This is a **static, editable snapshot**, not a runnable clone. Text and DOM/SVG content remain convertible; Canvas/video become raster images where browser security permits. Protected or WebGL canvases, dynamic maps and interaction logic may still need the separate PNG/scene/video capture workflows. The capture runs in the active browser tab and downloads locally; it removes scripts and form values before saving.
+
+The main workspace now uses compact, system-sans design-tool typography and denser controls. Its import/export semantics are unchanged.
+
 ## Record scroll and animation journeys as MP4 or GIF
 
 The same local [browser companion](./extension/) now includes three video workflows: **Guided full-page scroll**, **Fixed viewport / loop**, and **Manual interactions**. It captures the actual Chrome tab video stream (including animations and Canvas/WebGL) and exports local H.264 MP4 or animated GIF.
