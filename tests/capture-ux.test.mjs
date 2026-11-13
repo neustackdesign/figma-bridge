@@ -28,6 +28,14 @@ for(const id of ['sceneFrames','inspectPage','motionMode','motionFormat','motion
 for(const mode of ['guided','fixed','manual'])assert.ok(popup.includes('value="'+mode+'"'));
 for(const driver of ['wheel','position'])assert.ok(popup.includes('value="'+driver+'"'));
 assert.match(popupScript,/captureSceneFrames/);
+const primeStart=popupScript.indexOf('async function primePage(tabId)');
+const primeEnd=popupScript.indexOf('async function screenshot(tabId)',primeStart);
+const sceneStart=popupScript.indexOf('async function captureSceneFrames()');
+const sceneEnd=popupScript.indexOf('if(sceneFramesButton)',sceneStart);
+assert.ok(primeStart>0&&primeEnd>primeStart&&sceneStart>0&&sceneEnd>sceneStart);
+assert.match(popupScript.slice(primeStart,primeEnd),/await wait\(400\)/,'priming must dwell at each scroll stop');
+assert.match(popupScript.slice(sceneStart,sceneEnd),/original=await primePage\(tabId\)/,'scene frames must run full-page priming before capturing');
+
 assert.match(popupScript,/Input.dispatchMouseEvent/);
 assert.match(popupScript,/waitForIntro/);
 assert.match(popupScript,/fullscreenSequence/);
