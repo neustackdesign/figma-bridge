@@ -445,6 +445,177 @@ async function captureSceneFrames(){
 }
 if(sceneFramesButton)sceneFramesButton.addEventListener('click',captureSceneFrames);
 
+/* Rendered DOM capture: Chrome executes this function on the actual tab, not in
+ * the sandboxed URL importer. The document is CLONED and sanitized; live scripts
+ * are never bundled or run again in the exported snapshot. */
+async function bridgeSnapshotRenderedDOM({sweep=true}={}){
+  const sleep=ms=>new Promise(resolve=>setTimeout(resolve,ms));
+  const root=document.documentElement;
+  const oldX=window.scrollX,oldY=window.scrollY;
+  const nested=[...document.querySelectorAll('main,[data-scroll-container],[data-lenis-root],[data-scroll],#app')]
+    .filter(el=>el.clientHeight>=innerHeight*.6&&el.clientWidth>=innerWidth*.6&&el.scrollHeight>el.clientHeight+100)
+    .sort((a,b)=>b.scrollHeight-a.scrollHeight)[0];
+  const oldNested=nested?.scrollTop||0;
+  const visibleStates=new WeakMap();
+  const candidates=[...document.querySelectorAll('[data-reveal],[data-gsap],[data-animate],[data-animation],[data-aos],.reveal,.aos-init,[style*="opacity"]')].slice(0,2000);
+  const dimensions=()=>Math.max(root.scrollHeight,document.body?.scrollHeight||0,nested?.scrollHeight||0,innerHeight);
+  let observed=0,canvases=0,unsupportedCanvases=0,videos=0;
+  async function move(y){
+    const smoother=window.ScrollSmoother?.get?.();
+    if(smoother)smoother.scrollTop(y,false);
+    else if(window.lenis?.scrollTo)window.lenis.scrollTo(y,{immediate:true,force:true});
+    else if(nested)nested.scrollTop=y;
+    if(!nested||smoother||window.lenis)window.scrollTo({top:y,behavior:'instant'});
+    window.ScrollTrigger?.update?.();
+    await sleep(115);
+    for(const el of candidates){
+      if(!el.isConnected)continue;
+      const rect=el.getBoundingClientRect();
+      if(rect.bottom<=0||rect.top>=innerHeight||rect.width<=0||rect.height<=0)continue;
+      const cs=getComputedStyle(el);
+      if(cs.visibility!=='hidden'&&Number(cs.opacity)>.85){
+        if(!visibleStates.has(el))observed++;
+        visibleStates.set(el,{transform:cs.transform});
+      }
+    }
+  }
+  try{
+    if(sweep){
+      const maxSteps=Math.min(96,Math.ceil(dimensions()/Math.max(320,innerHeight*.78)));
+      for(let i=0;i<=maxSteps;i++)await move(Math.min(i*Math.max(320,innerHeight*.78),dimensions()));
+      await move(oldY);
+    }
+    await Promise.race([document.fonts?.ready||Promise.resolve(),sleep(1700)]);
+    const clone=root.cloneNode(true);
+    const sourceElements=[root,...root.querySelectorAll('*')];
+    const cloneElements=[clone,...clone.querySelectorAll('*')];
+    if(sourceElements.length!==cloneElements.length)throw Error('The DOM changed during capture. Try again after the page settles.');
+    for(let i=0;i<sourceElements.length;i++){
+      const original=sourceElements[i],copy=cloneElements[i];
+      if(!copy||!original.isConnected)continue;
+      if(original instanceof HTMLCanvasElement){
+        try{
+          const url=original.toDataURL('image/png');
+          if(url==='data:,')throw Error('Canvas has no pixels');
+          const image=document.createElement('img');
+          const box=original.getBoundingClientRect();
+          image.src=url;image.alt=original.getAttribute('aria-label')||'Captured canvas frame';
+          image.className=copy.className||'';
+          image.style.cssText=copy.style.cssText;
+          image.style.width=box.width+'px';image.style.height=box.height+'px';
+          copy.replaceWith(image);canvases++;
+        }catch{unsupportedCanvases++;}
+        continue;
+      }
+      if(original instanceof HTMLVideoElement&&original.readyState>=2&&original.videoWidth&&original.videoHeight){
+        try{
+          const frame=document.createElement('canvas');
+          frame.width=original.videoWidth;frame.height=original.videoHeight;
+          frame.getContext('2d').drawImage(original,0,0);
+          const image=document.createElement('img');
+          image.src=frame.toDataURL('image/png');
+          const box=original.getBoundingClientRect();
+          image.style.cssText=copy.style.cssText;
+          image.className=copy.className||'';
+          image.alt=original.getAttribute('aria-label')||'Captured video frame';
+          image.style.width=box.width+'px';image.style.height=box.height+'px';
+          copy.replaceWith(image);videos++;
+        }catch{}
+        continue;
+      }
+      if(original instanceof HTMLImageElement&&original.currentSrc&&
+          !original.currentSrc.startsWith('blob:')&&!original.currentSrc.startsWith('data:')){
+        copy.setAttribute('src',original.currentSrc);
+        copy.removeAttribute('srcset');
+        copy.removeAttribute('sizes');
+        copy.setAttribute('loading','eager');
+      }
+      const state=visibleStates.get(original);
+      if(state){
+        const cs=getComputedStyle(original);
+        if(Number(cs.opacity)<.85||cs.visibility==='hidden'){
+          copy.style.setProperty('opacity','1','important');
+          copy.style.setProperty('visibility','visible','important');
+          if(state.transform&&state.transform!=='none')copy.style.setProperty('transform',state.transform,'important');
+        }
+      }
+      const computed=getComputedStyle(original);
+      if(computed.animationName!=='none'){
+        copy.style.setProperty('transform',computed.transform,'important');
+        copy.style.setProperty('opacity',computed.opacity,'important');
+        copy.style.setProperty('visibility',computed.visibility,'important');
+      }
+    }
+    // Private input values and executable page code must never be exported.
+    clone.querySelectorAll('script,noscript,iframe,object,embed,link[rel="preload"],link[rel="prefetch"],link[rel="preconnect"]').forEach(el=>el.remove());
+    clone.querySelectorAll('*').forEach(el=>{
+      for(const attr of [...el.attributes]){
+        if(/^on/i.test(attr.name))el.removeAttribute(attr.name);
+      }
+      if(el.tagName==='INPUT'){
+        el.removeAttribute('value');el.removeAttribute('checked');
+      }else if(el.tagName==='TEXTAREA'){
+        el.textContent='';
+      }else if(el.tagName==='SELECT'){
+        el.querySelectorAll('option').forEach(option=>option.removeAttribute('selected'));
+      }
+      if(el.hasAttribute('srcdoc'))el.removeAttribute('srcdoc');
+    });
+    const head=clone.querySelector('head')||clone.insertBefore(document.createElement('head'),clone.firstChild);
+    head.querySelectorAll('base,meta[http-equiv="Content-Security-Policy"],meta[http-equiv="refresh"]').forEach(el=>el.remove());
+    const base=document.createElement('base');base.href=location.href;head.prepend(base);
+    const freeze=document.createElement('style');
+    freeze.id='bridge-rendered-capture';
+    freeze.textContent='html{scroll-behavior:auto!important}*,*::before,*::after{animation:none!important;transition:none!important;caret-color:transparent!important}';
+    head.append(freeze);
+    const html='<!doctype html>\n'+clone.outerHTML;
+    if(html.length>12000000)throw Error('Rendered page exceeds the 12 MB capture limit. Capture smaller sections instead.');
+    return {html,source:location.href,nodes:sourceElements.length,observed,canvases,unsupportedCanvases,videos};
+  }finally{
+    try{
+      if(nested)nested.scrollTop=oldNested;
+      const smoother=window.ScrollSmoother?.get?.();
+      if(smoother)smoother.scrollTop(oldY,false);
+      else if(window.lenis?.scrollTo)window.lenis.scrollTo(oldY,{immediate:true,force:true});
+      window.scrollTo(oldX,oldY);
+      window.ScrollTrigger?.update?.();
+    }catch{}
+  }
+}
+const captureRenderedButton=document.getElementById('captureRendered');
+captureRenderedButton?.addEventListener('click',async()=>{
+  if(running)return;
+  running=true;captureRenderedButton.disabled=true;
+  let blobUrl=null;
+  try{
+    const [tab]=await chrome.tabs.query({active:true,currentWindow:true});
+    if(!tab?.id||!/^https?:\/\//i.test(tab.url||''))throw Error('Open an ordinary website tab to capture rendered HTML.');
+    const motion=await chrome.runtime.sendMessage({target:'worker',type:'record-state'}).catch(()=>null);
+    if(['recording','starting','saving'].includes(motion?.phase))throw Error('Stop the active video recording before capturing HTML.');
+    setStatus('Capturing the rendered page and its scroll-reveal states…');
+    const output=await chrome.scripting.executeScript({
+      target:{tabId:tab.id},world:'MAIN',func:bridgeSnapshotRenderedDOM,
+      args:[{sweep:document.getElementById('sweepRendered')?.checked!==false}]
+    });
+    const data=output?.[0]?.result;
+    if(!data?.html)throw Error('The tab did not return a rendered document.');
+    const blob=new Blob([data.html],{type:'text/html;charset=utf-8'});
+    blobUrl=URL.createObjectURL(blob);
+    const host=new URL(data.source).hostname.replace(/[^a-z0-9.-]/gi,'-');
+    const id=await chrome.downloads.download({
+      url:blobUrl,filename:'figma-bridge/'+host+'-rendered.html',saveAs:false,conflictAction:'uniquify'
+    });
+    if(typeof id!=='number')throw Error('Chrome did not start the HTML download.');
+    const warning=data.unsupportedCanvases?' '+data.unsupportedCanvases+' protected canvas(es) need PNG fallback.':'';
+    setStatus('Rendered HTML download started ('+data.nodes+' DOM nodes). Import it in Bridge, then Copy to Figma.'+warning);
+  }catch(error){
+    setStatus('Rendered HTML capture failed: '+(error?.message||String(error)));
+  }finally{
+    running=false;captureRenderedButton.disabled=false;
+    if(blobUrl)setTimeout(()=>URL.revokeObjectURL(blobUrl),60000);
+  }
+});
+
 /* Motion recording is independent of full-page still-image capture. */
 const motionFormat=document.getElementById('motionFormat');
 const motionQuality=document.getElementById('motionQuality');
