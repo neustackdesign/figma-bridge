@@ -518,7 +518,7 @@ if(sceneFramesButton)sceneFramesButton.addEventListener('click',captureSceneFram
 /* Rendered DOM capture: Chrome executes this function on the actual tab, not in
  * the sandboxed URL importer. The document is CLONED and sanitized; live scripts
  * are never bundled or run again in the exported snapshot. */
-async function bridgeSnapshotRenderedDOM({sweep=true}={}){
+async function bridgeSnapshotRenderedDOM({sweep=true,maxSweepMs=45000}={}){
   const sleep=ms=>new Promise(resolve=>setTimeout(resolve,ms));
   const root=document.documentElement;
   const oldX=window.scrollX,oldY=window.scrollY;
@@ -529,7 +529,8 @@ async function bridgeSnapshotRenderedDOM({sweep=true}={}){
   const visibleStates=new WeakMap();
   const revealSelector='[data-reveal],[data-gsap],[data-animate],[data-animation],[data-aos],.reveal,.aos-init,[style*="opacity"]';
   const dimensions=()=>Math.max(root.scrollHeight,document.body?.scrollHeight||0,nested?.scrollHeight||0,innerHeight);
-  let observed=0,canvases=0,unsupportedCanvases=0,videos=0,repairedSections=0,collapsedSections=0;
+  let observed=0,canvases=0,unsupportedCanvases=0,videos=0,repairedSections=0,collapsedSections=0,sweepPartial=false;
+  const budget=Math.min(45000,Math.max(1000,Number(maxSweepMs)||45000));
   async function move(y){
     const smoother=window.ScrollSmoother?.get?.();
     if(smoother)smoother.scrollTop(y,false);
@@ -559,14 +560,19 @@ async function bridgeSnapshotRenderedDOM({sweep=true}={}){
   }
   try{
     if(sweep){
-      const step=Math.max(220,Math.floor(innerHeight*.55));
-      const maxSteps=Math.min(120,Math.ceil(dimensions()/step)+2);
+      const step=Math.max(220,Math.floor(innerHeight*.55),
+        Math.ceil(Math.max(0,dimensions()-innerHeight)/42));
+      const maxSteps=Math.min(65,Math.ceil(dimensions()/step)+2);
+      const deadline=Date.now()+budget;
+      let complete=false;
       for(let i=0;i<=maxSteps;i++){
+        if(Date.now()>=deadline){sweepPartial=true;break;}
         const bottom=Math.max(0,dimensions()-innerHeight);
         const target=Math.min(i*step,bottom);
         await move(target);
-        if(target>=bottom)break;
+        if(target>=bottom){complete=true;break;}
       }
+      if(!complete)sweepPartial=true;
       await move(oldY);
     }
     await Promise.race([document.fonts?.ready||Promise.resolve(),sleep(2500)]);
@@ -673,7 +679,7 @@ async function bridgeSnapshotRenderedDOM({sweep=true}={}){
     const unsettled=[...document.querySelectorAll('[aria-busy="true"],[class*="skeleton"],[class*="Skeleton"],[data-state="loading"]')]
       .filter(el=>{const r=el.getBoundingClientRect(),st=getComputedStyle(el);
         return r.width>0&&r.height>0&&st.display!=='none'&&st.visibility!=='hidden'}).length;
-    return {html,source:location.href,nodes:sourceElements.length,observed,canvases,unsupportedCanvases,videos,unsettled,repairedSections,collapsedSections};
+    return {html,source:location.href,nodes:sourceElements.length,observed,canvases,unsupportedCanvases,videos,unsettled,repairedSections,collapsedSections,sweepPartial};
   }finally{
     try{
       if(nested)nested.scrollTop=oldNested;
@@ -712,7 +718,8 @@ captureRenderedButton?.addEventListener('click',async()=>{
     const warning=(data.unsupportedCanvases?' '+data.unsupportedCanvases+' protected canvas(es) need PNG fallback.':'')
       +(data.unsettled?' '+data.unsettled+' loading placeholder(s) remained; inspect the source page or capture screenshots as a fallback.':'')
       +(data.repairedSections?' Restored '+data.repairedSections+' observed expanded section(s).':'')
-      +(data.collapsedSections?' '+data.collapsedSections+' section(s) remained collapsed and need scene/image capture.':'');
+      +(data.collapsedSections?' '+data.collapsedSections+' section(s) remained collapsed and need scene/image capture.':'')
+      +(data.sweepPartial?' Preparation reached the 45-second safety budget. Some dynamic sections may be incomplete.':'');
     setStatus('Rendered HTML download started ('+data.nodes+' DOM nodes). Import it in Bridge, then Copy to Figma.'+warning);
   }catch(error){
     setStatus('Rendered HTML capture failed: '+(error?.message||String(error)));
