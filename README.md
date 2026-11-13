@@ -71,6 +71,12 @@ Auto Layout is inferred by `@figit/dom-to-figma` for flex, grid, wrapping and bl
 
 The browser conversion engine is the MIT-licensed [`@figit/dom-to-figma`](https://github.com/figitdesign/web-to-figma) package rather than a Neustack reimplementation.
 
+### Web URL import and dynamic-page safety (v0.3.6)
+
+The **Website URL** tab fetches public **server HTML**, not a live browser session. It now recovers explicit AOS/scroll-reveal markers in its static preview, checks whether meaningful main content is visible, and refuses to label blank JavaScript-dependent page shells "Ready." Response and timeout errors distinguish API failures from script-dependent content. A successful import is labelled **Static preview**; the companion's **Editable → Download rendered HTML** remains the preferred path for heavily dynamic websites.
+
+The Chrome companion now bounds its gradual pre-scroll to 45 seconds and reports a partial-capture warning instead of silently sweeping very long/infinite pages indefinitely. Original site scroll positions are restored even when preparation ends early. These safeguards are not a guarantee of pixel-perfect capture of complex WebGL, 3D, Lottie or asynchronous content.
+
 ### Preserving animated section geometry (v0.3.5)
 
 Live-page HTML capture records the widest **actually visible** state of scroll-animated containers during the gradual sweep. If a content section later contracts to zero width, the snapshot restores that previously observed geometry instead of exporting an empty panel. It never guesses an unseen size: any unresolved collapsed sections are reported as needing PNG/scene capture. This specifically covers the collapsed width state observed in the uploaded Chowdeck HTML's "What's on Deck?" section. Existing static import/export paths remain unchanged.
