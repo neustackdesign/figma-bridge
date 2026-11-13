@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Figma Bridge — Capture",
-  "version": "0.3.2",
+  "version": "0.3.3",
   "description": "Capture rendered website HTML for editable import, plus complete screenshots and animated scrolling as PNG, JPG, MP4 or GIF.",
   "minimum_chrome_version": "116",
   "permissions": [
