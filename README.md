@@ -88,6 +88,20 @@ This is a **static, editable snapshot**, not a runnable clone. Text and DOM/SVG 
 
 The main workspace now uses compact, system-sans design-tool typography and denser controls. Its import/export semantics are unchanged.
 
+### Updating the Chrome companion (and diagnosing an outdated popup)
+
+The Bridge web workspace at `https://bridge.neustackstudio.com/` deploys from Vercel. **You do not need to pull the repo locally to update that website.**
+
+The unpacked Chrome companion is different: it runs the files Chrome originally loaded from disk. `git pull` only updates that companion if Chrome points to the **same local `extension/` folder**.
+
+1. In Terminal, open your `figma-bridge` checkout and run `git pull --ff-only`. Verify the version in `extension/manifest.json`.
+2. Go to `chrome://extensions` → Developer mode. Find **Figma Bridge — Capture** and inspect its loaded folder/extension ID. If the active extension points to another directory or an older downloaded ZIP, stop using that copy.
+3. Use **Load unpacked** and select the `extension/` folder inside the updated checkout (not the repository root, `dist/`, or an older copy).
+4. The new popup header reads **Bridge v0.3.4**. It has **Editable**, **Images**, and **Motion** tabs. If you still see a large “Figma Bridge” heading and a long list of sections, Chrome is running the old popup.
+5. Do not confuse the separate Figma development plugin with the Chrome capture companion; they have different manifests.
+
+Bridge keeps browser permission dialogs and native accessible form semantics where required. The app and companion interfaces themselves have custom styling and controls.
+
 ## Record scroll and animation journeys as MP4 or GIF
 
 The same local [browser companion](./extension/) now includes three video workflows: **Guided full-page scroll**, **Fixed viewport / loop**, and **Manual interactions**. It captures the actual Chrome tab video stream (including animations and Canvas/WebGL) and exports local H.264 MP4 or animated GIF.
