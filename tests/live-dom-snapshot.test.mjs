@@ -68,6 +68,13 @@ try{
   assert.match(captured.html,/id="bridge-rendered-capture"/,'Motion is frozen in the static import');
   const scroll=await page.evaluate(()=>scrollY);
   assert.equal(scroll,0,'Original page scroll position must be restored');
+  // A page that continues expanding must return a partial warning instead of
+  // holding the extension popup indefinitely.
+  await page.evaluate(()=>{document.body.style.minHeight='16000px';});
+  const bounded=await page.evaluate(src=>(0,eval)('('+src+')')({sweep:true,maxSweepMs:1000}),captureSource);
+  assert.equal(bounded.sweepPartial,true,'A tight safety budget must report incomplete preparation');
+  assert.equal(await page.evaluate(()=>scrollY),0,'Timed-out preparation must restore the source scroll position');
+
   console.log('Live DOM snapshot regression passed: hydration, delayed loading, expanded geometry, fallback reporting, sanitization and restoration.');
 }finally{
   await browser.close();
