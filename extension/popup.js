@@ -4,7 +4,7 @@ const statusPanel=document.querySelector('#statusPanel');
 const buttons=[...document.querySelectorAll('[data-format]')];
 const setStatus=(message,error=false,success=false)=>{
   statusNode.textContent=message;
-  if(statusPanel)statusPanel.dataset.state=error?'error':success?'success':'idle';
+  if(statusPanel?.dataset)statusPanel.dataset.state=error?'error':success?'success':'idle';
 };
 // Keep workflow navigation independent of the capture engines. Existing buttons,
 // IDs and permissions remain unchanged.
