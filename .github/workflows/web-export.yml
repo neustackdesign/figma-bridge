@@ -12,6 +12,7 @@ on:
       - tests/bundled-import.smoke.mjs
       - tests/animated-capture.test.mjs
       - tests/live-dom-snapshot.test.mjs
+      - tests/companion-ui.test.mjs
       - extension/popup.js
       - extension/popup.html
       - .github/workflows/web-export.yml
@@ -24,6 +25,7 @@ on:
       - tests/bundled-import.smoke.mjs
       - tests/animated-capture.test.mjs
       - tests/live-dom-snapshot.test.mjs
+      - tests/companion-ui.test.mjs
       - extension/popup.js
       - extension/popup.html
       - .github/workflows/web-export.yml
@@ -65,6 +67,7 @@ jobs:
           node tests/capture-ux.test.mjs
           node tests/motion-capture.test.mjs
           node tests/live-dom-snapshot.test.mjs
+          node tests/companion-ui.test.mjs
           node tests/exporter-smoke.mjs
           node --test tests/analytics-consent.test.mjs tests/seo-smoke.mjs
       - name: Start isolated Bridge static app
