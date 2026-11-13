@@ -1,7 +1,52 @@
 /* Figma Bridge: browser-native capture. No remote code, server, or tracking. */
-const statusNode = document.querySelector('#status');
-const buttons = [...document.querySelectorAll('[data-format]')];
-const setStatus = message => { statusNode.textContent = message; };
+const statusNode=document.querySelector('#status');
+const statusPanel=document.querySelector('#statusPanel');
+const buttons=[...document.querySelectorAll('[data-format]')];
+const setStatus=(message,error=false,success=false)=>{
+  statusNode.textContent=message;
+  if(statusPanel?.dataset)statusPanel.dataset.state=error?'error':success?'success':'idle';
+};
+// Keep workflow navigation independent of the capture engines. Existing buttons,
+// IDs and permissions remain unchanged.
+const workflowTabs=[...document.querySelectorAll('[data-workflow]')];
+const workflowPanels=[...document.querySelectorAll('[data-workflow-panel]')];
+const hasWorkspaceUI=workflowTabs.length===3&&workflowPanels.length===3&&
+  workflowTabs.every(tab=>typeof tab.setAttribute==='function'&&typeof tab.addEventListener==='function'&&tab.dataset)&&
+  workflowPanels.every(panel=>panel.dataset);
+function selectWorkflow(name,focus=false){
+  // Capture regression harnesses intentionally mock only the controls they test.
+  if(!hasWorkspaceUI)return;
+  for(const tab of workflowTabs){
+    const active=tab.dataset.workflow===name;
+    tab.setAttribute('aria-selected',String(active));
+    tab.tabIndex=active?0:-1;
+    if(active&&focus)tab.focus();
+  }
+  for(const panel of workflowPanels)panel.hidden=panel.dataset.workflowPanel!==name;
+}
+if(hasWorkspaceUI)workflowTabs.forEach((tab,index)=>{
+  tab.addEventListener('click',()=>selectWorkflow(tab.dataset.workflow));
+  tab.addEventListener('keydown',event=>{
+    if(!['ArrowLeft','ArrowRight','Home','End'].includes(event.key))return;
+    event.preventDefault();
+    const next=event.key==='Home'?0:event.key==='End'?workflowTabs.length-1:
+      (index+(event.key==='ArrowRight'?1:-1)+workflowTabs.length)%workflowTabs.length;
+    selectWorkflow(workflowTabs[next].dataset.workflow,true);
+  });
+});
+selectWorkflow('design');
+const buildVersion=document.querySelector('#buildVersion');
+if(buildVersion&&chrome.runtime?.getManifest)
+  buildVersion.textContent='v'+chrome.runtime.getManifest().version;
+if(typeof chrome.tabs?.query==='function')chrome.tabs.query({active:true,currentWindow:true}).then(tabs=>{
+  const tab=tabs?.[0],label=document.querySelector('#tabSite');
+  if(!label)return;
+  if(/^https?:\/\//i.test(tab?.url||'')){
+    const site=new URL(tab.url).hostname;
+    label.textContent=site;
+    label.title=site;
+  }else label.textContent='Open a website';
+}).catch(()=>{});
 const wait = ms => new Promise(resolve => setTimeout(resolve, ms));
 const MAX_PIXELS = 80000000;
 const MAX_TILES = 150;
@@ -690,8 +735,10 @@ async function getMotionState(){
     if(!result?.ok)return;
     setMotionUi(result.phase);
     if(result.phase==='recording'){
+      selectWorkflow('motion');
       setStatus('Recording '+result.format?.toUpperCase()+' in the active tab. You can close this popup and return to the page.');
     }else if(result.phase==='saving'){
+      selectWorkflow('motion');
       setStatus('Encoding and saving recording…');
     }else if(result.error){
       setStatus('Previous recording: '+result.error,true);

@@ -1,51 +1,143 @@
 <!doctype html>
-<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Figma Bridge — Capture</title>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Bridge — Capture</title>
 <style>
-:root{color-scheme:light;font-family:system-ui,-apple-system,Arial,sans-serif}
-*{box-sizing:border-box}body{width:354px;padding:18px;margin:0;background:#f7f6f3;color:#171713}
-h1{font-size:21px;font-weight:650;letter-spacing:-.5px;margin:0 0 6px}h2{font-size:14px;margin:0 0 8px}
-p{font-size:12px;line-height:1.5;color:#585954}
-.section{border-top:1px solid #dddcd7;padding-top:14px;margin-top:16px}
-.actions{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:10px 0}
-button{border:1px solid #1b1b19;background:#1b1b19;color:white;border-radius:7px;padding:11px 10px;font:inherit;font-size:12px;font-weight:600;cursor:pointer}
-button.secondary{background:white;color:#171713}button:disabled{opacity:.45;cursor:wait}
-.form{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px}label{font-size:11px;font-weight:600;display:block;margin-bottom:4px}
-select{width:100%;height:37px;background:#fff;border:1px solid #c9c9c3;border-radius:6px;color:#222;font-size:12px;padding:0 7px}
-.help{font-size:11px;color:#61625b;margin:8px 0 11px}
-#status{border-top:1px solid #d8d8d2;padding-top:12px;min-height:34px;overflow-wrap:break-word;font-size:12px}
-a{color:inherit}.actionLink{background:#fff;border:1px solid #d1cec7;border-radius:6px;padding:8px 10px;text-decoration:none;font-size:11px;font-weight:600}.actions:has(.actionLink){grid-template-columns:1fr 1fr}small{color:#6d6e67;font-size:11px;display:block;line-height:1.4;margin-top:10px}
-#stopRecord{display:none;width:100%;background:#a83624;border-color:#a83624}
-</style></head><body>
-<h1>Figma Bridge <span style="font:600 11px system-ui;color:#787872;vertical-align:middle">v0.3.3</span></h1>
-<p>Capture the real rendered website — static frames or scroll-driven animations.</p>
-<section class="section" aria-label="Still image export"><h2>Still image capture</h2>
-<div class="actions"><button data-format="png">Full-page PNG</button><button class="secondary" data-format="jpeg">Full-page JPG</button></div>
-<div class="actions"><button class="secondary" id="sceneFrames">Prime page + capture 8 frames</button></div>
-<p class="help">A full-page image flattens animations. For virtual GSAP/Canvas sites, PNG/JPG automatically saves a labelled scene sequence. Scene frames first run a gradual pre-scroll to load delayed content, then capture pinned and transforming sections.</p>
-<div class="actions"><button class="secondary" id="inspectPage">Diagnose this website</button></div>
-<p class="help" id="diagnostics" aria-live="polite">Inspect its scrolling engine, pinned sections, canvas content and capture dimensions before exporting.</p>
-</section>
-<section class="section" aria-label="Rendered page snapshot">
-<h2>Editable live-page capture</h2>
-<p class="help">Capture the page after its JavaScript has rendered. Saves a static HTML snapshot with DOM text, SVG, styles and supported canvas frames for import into Bridge. It does not export working site interactions.</p>
-<label for="sweepRendered" style="display:flex;align-items:center;gap:8px;font-size:11px;font-weight:500;line-height:1.45;margin:0 0 10px"><input id="sweepRendered" type="checkbox" checked> Reveal lazy and scroll-triggered content first</label>
-<button id="captureRendered" class="secondary" style="width:100%">Download rendered HTML for Figma</button>
-<p class="help">Import the downloaded .html file in the Bridge app, then choose Copy to Figma. Use PNG/scene frames for unsupported WebGL or cross-origin canvas.</p>
-</section>
-<section class="section" aria-label="Motion capture"><h2>Animation recording</h2>
-<div class="form">
-<div><label for="motionMode">Workflow</label><select id="motionMode"><option value="guided">Guided full-page scroll</option><option value="fixed">Fixed viewport / loop</option><option value="manual">Manual interactions</option></select></div>
-<div><label for="motionFormat">Export</label><select id="motionFormat"><option value="mp4">MP4 · H.264</option><option value="gif">Animated GIF</option></select></div>
-<div><label for="motionDuration">Duration</label><select id="motionDuration"><option value="10">10 seconds</option><option value="20" selected>20 seconds</option><option value="30">30 seconds</option><option value="45">45 seconds</option><option value="60">60 seconds</option></select></div>
-<div><label for="motionQuality">Resolution</label><select id="motionQuality"><option value="720">720p · recommended</option><option value="1080">1080p · MP4 only</option></select></div>
-<div style="grid-column:span 2"><label for="motionDriver">Scroll method (guided only)</label>
-<select id="motionDriver"><option value="wheel">Natural wheel · best for animated sites</option><option value="position">Position-based · conventional pages</option></select></div>
-</div>
-<div id="motionHelp" class="help">Scrolls through the site and records each animation in motion. Keep the target tab visible.</div>
-<button id="startRecord" style="width:100%">Record animation</button><button id="stopRecord">Stop and export</button>
-</section>
-<section class="section"><h2>Import and design export</h2><p>Convert HTML, SVG, PDF and web pages into editable Figma layers in the browser app. Export Figma layers back to HTML with the separate Figma plugin.</p><div class="actions"><a class="actionLink" href="https://bridge.neustackstudio.com/" target="_blank" rel="noopener noreferrer">Open Bridge app ↗</a><a class="actionLink" href="https://bridge.neustackstudio.com/plugin/" target="_blank" rel="noopener noreferrer">Figma exporter ↗</a></div></section>
-<p id="status" role="status" aria-live="polite">Open the page you want to capture.</p>
-<small>On-device capture, no upload. JPG/PNG uses Chrome's screenshot renderer. MP4/GIF records the current viewport over time. Animation recording requires Chrome 116+ and may use significant memory for longer or high-resolution recordings. <a href="https://bridge.neustackstudio.com/">Open Bridge</a></small>
+:root{
+  color-scheme:light;
+  font-family:Inter,-apple-system,BlinkMacSystemFont,"Segoe UI",system-ui,sans-serif;
+  --ink:#1d1f23;--muted:#777a83;--edge:#e4e5e9;--soft:#f5f6f8;
+  --accent:#2563eb;--accentHover:#174dc1;--radius:8px;
+}
+*{box-sizing:border-box}
+html,body{margin:0;padding:0;width:368px;background:#fff;color:var(--ink);font-size:12px;line-height:1.45;-webkit-font-smoothing:antialiased}
+button,select,input{font:inherit}
+button{cursor:pointer}
+button:disabled{opacity:.48;cursor:not-allowed}
+[hidden]{display:none!important}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.topbar{display:flex;align-items:center;justify-content:space-between;gap:12px;height:49px;padding:0 15px;border-bottom:1px solid var(--edge)}
+.brand{display:flex;align-items:center;gap:8px;min-width:0}
+.brandIcon{display:grid;place-items:center;width:25px;height:25px;border-radius:7px;background:#25272a;color:#fff;font-size:16px;font-weight:650}
+.brandName{font-size:13px;font-weight:720;letter-spacing:-.02em}
+.version{font-size:10px;color:#71757e;border:1px solid var(--edge);border-radius:5px;padding:2px 6px;font-variant-numeric:tabular-nums}
+.website{color:var(--muted);font-size:11px;max-width:130px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;text-align:right}
+.workflows{display:grid;grid-template-columns:repeat(3,1fr);height:42px;border-bottom:1px solid var(--edge);padding:0 8px}
+.workflowTab{position:relative;border:0;background:transparent;color:var(--muted);font-weight:600;font-size:11.5px}
+.workflowTab:hover{color:var(--ink);background:#f8f9fa}
+.workflowTab[aria-selected="true"]{color:var(--ink)}
+.workflowTab[aria-selected="true"]::after{position:absolute;content:"";height:2px;background:var(--accent);bottom:-1px;left:15px;right:15px;border-radius:2px}
+.view{min-height:224px;max-height:415px;overflow-y:auto;padding:17px 15px 16px;scrollbar-color:#cfd1d6 transparent;scrollbar-width:thin}
+.eyebrow{font-size:10px;line-height:1.25;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:#878b93;margin:0 0 7px}
+h1{font-size:16px;line-height:1.25;font-weight:690;letter-spacing:-.025em;margin:0 0 6px}
+h2{font-size:12px;font-weight:650;letter-spacing:-.005em;margin:0 0 8px}
+p{font-size:11.5px;color:#6b6f78;line-height:1.5;margin:0 0 13px}
+.help{font-size:11px;color:#777b83;line-height:1.5;margin:10px 0}
+.note{padding:11px;border:1px solid var(--edge);background:#fafafb;border-radius:7px}
+.note strong{color:#303239;font-weight:650}
+.note p{margin:0;font-size:11px}
+.section{border-top:1px solid var(--edge);padding-top:14px;margin-top:16px}
+.actions{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;margin:10px 0}
+button.action,.actionLink{min-height:34px;border:1px solid var(--edge);background:#fff;color:#32353c;border-radius:7px;display:inline-flex;align-items:center;justify-content:center;text-align:center;padding:8px 10px;font-size:11.5px;font-weight:630;line-height:1.3;text-decoration:none}
+button.action:hover:not(:disabled),.actionLink:hover{background:#f6f7f9;border-color:#cdd0d5}
+button.action.primary{background:var(--accent);border-color:var(--accent);color:#fff}
+button.action.primary:hover:not(:disabled){background:var(--accentHover)}
+button.action.dark{background:#27292d;border-color:#27292d;color:#fff}
+button.action.dark:hover:not(:disabled){background:#404348}
+button.action.danger{background:#bd3d34;border-color:#bd3d34;color:#fff}
+button.action.wide{width:100%;min-height:38px}
+.buttonRow{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:13px}
+.checkboxRow{display:flex;align-items:flex-start;gap:9px;padding:11px 0;margin:0 0 5px;cursor:pointer;font-size:11.5px;font-weight:550}
+.checkboxRow input{width:15px;height:15px;flex:none;margin:1px 0 0;accent-color:var(--accent)}
+.checkboxRow span{line-height:1.4}
+.form{display:grid;grid-template-columns:1fr 1fr;gap:11px 8px;margin:14px 0}
+.formField{min-width:0}
+.formField.full{grid-column:1/-1}
+.formField label{display:block;font-size:10.5px;font-weight:650;color:#565a63;margin-bottom:5px}
+.selectWrap{position:relative;display:block}
+.selectWrap:after{content:"";width:6px;height:6px;border-right:1.5px solid #777b83;border-bottom:1.5px solid #777b83;transform:translateY(-70%) rotate(45deg);position:absolute;right:12px;top:50%;pointer-events:none}
+select{width:100%;height:35px;appearance:none;-webkit-appearance:none;padding:0 27px 0 10px;border:1px solid #d9dce1;border-radius:7px;background:#fff;color:var(--ink);font-size:11.5px;outline:none}
+select:focus{border-color:var(--accent)}
+select:disabled{background:#f3f4f5;color:#999da5}
+.statusPanel{display:flex;align-items:flex-start;gap:9px;border-top:1px solid var(--edge);background:#fafafb;padding:11px 15px;min-height:44px}
+.statusDot{width:7px;height:7px;flex:none;margin-top:4px;background:#a4a8b0;border-radius:50%}
+.statusPanel[data-state="success"] .statusDot{background:#178654}
+.statusPanel[data-state="error"] .statusDot{background:#c0392b}
+#status{font-size:11px;color:#666b74;line-height:1.4;overflow-wrap:anywhere}
+.footer{display:flex;justify-content:space-between;align-items:center;padding:9px 15px 11px;gap:12px}
+.footerLinks{display:flex;gap:12px}
+.footer a{font-size:10.5px;font-weight:600;text-decoration:none;color:#41454e}
+.footer a:hover{text-decoration:underline}
+.footerMeta{font-size:10px;color:#91949c}
+#stopRecord{display:none}
+#diagnostics{white-space:normal}
+</style>
+</head>
+<body>
+<header class="topbar">
+  <div class="brand"><span class="brandIcon" aria-hidden="true">↔</span><span class="brandName">Bridge</span><span id="buildVersion" class="version">v0.3.4</span></div>
+  <span id="tabSite" class="website" title="Active website">Capture companion</span>
+</header>
+<nav class="workflows" role="tablist" aria-label="Capture workflow">
+  <button type="button" class="workflowTab" id="tab-design" data-workflow="design" role="tab" aria-controls="panel-design" aria-selected="true" tabindex="0">Editable</button>
+  <button type="button" class="workflowTab" id="tab-images" data-workflow="images" role="tab" aria-controls="panel-images" aria-selected="false" tabindex="-1">Images</button>
+  <button type="button" class="workflowTab" id="tab-motion" data-workflow="motion" role="tab" aria-controls="panel-motion" aria-selected="false" tabindex="-1">Motion</button>
+</nav>
+<main>
+  <section class="view" id="panel-design" data-workflow-panel="design" role="tabpanel" aria-labelledby="tab-design">
+    <div class="eyebrow">Web → Figma</div>
+    <h1>Capture editable layers</h1>
+    <p>Capture a website after JavaScript, lazy content and scroll reveals have loaded. Preserve editable text, vectors and supported image layers.</p>
+    <label for="sweepRendered" class="checkboxRow">
+      <input id="sweepRendered" type="checkbox" checked>
+      <span>Prime full page before capture <span style="color:#7c8088;font-weight:400">(recommended)</span></span>
+    </label>
+    <button type="button" id="captureRendered" class="action primary wide">Download rendered HTML</button>
+    <p class="help">Open the downloaded HTML in Bridge, then choose <strong>Copy to Figma</strong>. This is a static design capture, not a working website clone.</p>
+    <div class="note"><p><strong>Dynamic regions.</strong> Protected canvases, embedded frames and network-dependent widgets may need image or scene capture instead.</p></div>
+  </section>
+  <section class="view" id="panel-images" data-workflow-panel="images" role="tabpanel" aria-labelledby="tab-images" hidden>
+    <div class="eyebrow">Visual capture</div>
+    <h1>Export rendered pixels</h1>
+    <p>Save the page as a single image, or preserve distinct moments in an animated, pinned or scroll-driven section.</p>
+    <div class="buttonRow">
+      <button type="button" class="action dark" data-format="png">Full-page PNG</button>
+      <button type="button" class="action" data-format="jpeg">Full-page JPG</button>
+    </div>
+    <button type="button" class="action wide" id="sceneFrames" style="margin-top:8px">Prime page + capture 8 frames</button>
+    <p class="help">Bridge gradually scrolls before taking scene frames. A stitched screenshot cannot represent every animation state at once.</p>
+    <div class="section">
+      <h2>Capture diagnostics</h2>
+      <button type="button" id="inspectPage" class="action">Diagnose this website</button>
+      <p id="diagnostics" class="help" aria-live="polite">Inspect its scroll engine, pinned sections, canvas and page dimensions.</p>
+    </div>
+  </section>
+  <section class="view" id="panel-motion" data-workflow-panel="motion" role="tabpanel" aria-labelledby="tab-motion" hidden>
+    <div class="eyebrow">Recorded motion</div>
+    <h1>Record the live tab</h1>
+    <p>Capture real scrolling and interactions as local MP4 or GIF. Choose automatic scrolling or control the page yourself.</p>
+    <div class="form">
+      <div class="formField"><label for="motionMode">Workflow</label><div class="selectWrap"><select id="motionMode"><option value="guided">Guided scroll</option><option value="fixed">Fixed viewport / loop</option><option value="manual">Manual interactions</option></select></div></div>
+      <div class="formField"><label for="motionFormat">Format</label><div class="selectWrap"><select id="motionFormat"><option value="mp4">MP4 · H.264</option><option value="gif">Animated GIF</option></select></div></div>
+      <div class="formField"><label for="motionDuration">Duration</label><div class="selectWrap"><select id="motionDuration"><option value="10">10 seconds</option><option value="20" selected>20 seconds</option><option value="30">30 seconds</option><option value="45">45 seconds</option><option value="60">60 seconds</option></select></div></div>
+      <div class="formField"><label for="motionQuality">Resolution</label><div class="selectWrap"><select id="motionQuality"><option value="720">720p</option><option value="1080">1080p · MP4</option></select></div></div>
+      <div class="formField full"><label for="motionDriver">Scroll method (guided only)</label><div class="selectWrap"><select id="motionDriver"><option value="wheel">Natural wheel · animations</option><option value="position">Position-based · static pages</option></select></div></div>
+    </div>
+    <p class="help" id="motionHelp">Bridge scrolls and records each animated state. Keep the source tab visible.</p>
+    <button type="button" id="startRecord" class="action primary wide">Record animation</button>
+    <button type="button" id="stopRecord" class="action danger wide">Stop and export</button>
+  </section>
+</main>
+<div id="statusPanel" class="statusPanel" data-state="idle"><span class="statusDot" aria-hidden="true"></span><span id="status" role="status" aria-live="polite">Open a website to capture.</span></div>
+<footer class="footer">
+  <div class="footerLinks">
+    <a href="https://bridge.neustackstudio.com/" target="_blank" rel="noopener noreferrer">Open workspace ↗</a>
+    <a href="https://bridge.neustackstudio.com/plugin/" target="_blank" rel="noopener noreferrer">Figma exporter ↗</a>
+  </div>
+  <span class="footerMeta">Local capture</span>
+</footer>
 <script src="popup.js"></script>
-</body></html>
+</body>
+</html>
