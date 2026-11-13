@@ -94,25 +94,39 @@ async function waitForIntro(tabId,allowVirtual=false){
 }
 
 async function primePage(tabId) {
-  const initial = await evaluate(tabId, dimensionsScript);
-  if (!initial || initial.height < 1 || initial.viewportHeight < 1) {
-    throw new Error('The page has no measurable viewport.');
+  const initial=await evaluate(tabId,dimensionsScript);
+  if(!initial||initial.height<1||initial.viewportHeight<1)
+    throw Error('The page has no measurable viewport.');
+  // Use a gradual, overlapping sweep. Large jumps miss IntersectionObserver
+  // reveals and async content that only mounts after sustained visibility.
+  const step=Math.max(180,Math.floor(initial.viewportHeight*.55));
+  const maxVisits=Math.min(MAX_TILES,120);
+  let y=0,visits=0,lastBottom=0;
+  try {
+    while(visits++<maxVisits){
+      const metrics=await evaluate(tabId,dimensionsScript);
+      const bottom=Math.max(0,Math.min(metrics.height-metrics.viewportHeight,150000));
+      const target=Math.min(y,bottom);
+      await evaluate(tabId,scrollExpression(target));
+      // scrollExpression itself waits 360ms. Additional dwell gives delayed
+      // section transitions, image loading and API-backed widgets a chance.
+      await wait(400);
+      const pending=await evaluate(tabId,'(() => {const visible=el=>{const r=el.getBoundingClientRect();return r.width>0&&r.height>0&&r.bottom>0&&r.top<innerHeight};return [...document.images].filter(img=>visible(img)&&!img.complete).length})()');
+      if(pending>0)await wait(700);
+      setStatus('Preparing animated and lazy sections… '+Math.min(100,Math.round(target/Math.max(1,bottom)*100))+'%');
+      lastBottom=bottom;
+      if(target>=bottom&&y>=bottom)break;
+      y+=step;
+    }
+    // Some requests start only after earlier lazy sections were visited.
+    await evaluate(tabId,'Promise.race([Promise.all([document.fonts?.ready||Promise.resolve(),...Array.from(document.images).map(img=>img.complete?Promise.resolve():new Promise(resolve=>{img.addEventListener("load",resolve,{once:true});img.addEventListener("error",resolve,{once:true})}))]),new Promise(resolve=>setTimeout(resolve,5000))]).then(()=>true)',7000);
+  }finally{
+    // Always restore the top before scene or tile capture, including failures.
+    await evaluate(tabId,scrollExpression(0));
+    await wait(550);
   }
-  const step = Math.max(260, Math.floor(initial.viewportHeight * 0.8));
-  let y = 0;
-  let visits = 0;
-  // Re-measure: lazy sections can grow the document as they become visible.
-  while (visits++ < MAX_TILES && y < Math.min((await evaluate(tabId, dimensionsScript)).height, 150000)) {
-    await evaluate(tabId, scrollExpression(y));
-    y += step;
-    setStatus(`Loading scroll content… ${Math.min(100,Math.round(y / Math.max(1,initial.height)*100))}%`);
-  }
-  await evaluate(tabId, `Promise.race([
-    Promise.all([document.fonts?.ready||Promise.resolve(),...Array.from(document.images).map(img=>img.complete?Promise.resolve():new Promise(r=>{img.addEventListener('load',r,{once:true});img.addEventListener('error',r,{once:true})}))]),
-    new Promise(r=>setTimeout(r,3500))
-  ]).then(()=>true)`, 6500);
-  await evaluate(tabId,scrollExpression(0));
-  return await evaluate(tabId,dimensionsScript);
+  const finalMetrics=await evaluate(tabId,dimensionsScript);
+  return {...finalMetrics,primedSections:visits,scrollRange:lastBottom};
 }
 
 async function screenshot(tabId) {
@@ -399,6 +413,10 @@ async function captureSceneFrames(){
     original=await evaluate(tabId,dimensionsScript);
     if(!original?.viewportWidth||!original?.viewportHeight)throw Error('Cannot measure this page.');
     await waitForIntro(tabId,true); // Retain virtual-scroll sequences but skip unfinished page loaders.
+    setStatus("Preparing the full page before scene capture…");
+    // Scene capture previously skipped the priming pass used by full-page
+    // screenshots, so lazy sections appeared as skeletons or empty regions.
+    original=await primePage(tabId);
     const count=8,maxScroll=Math.max(0,original.height-original.viewportHeight);
     const delta=Math.max(170,Math.min(700,Math.ceil(maxScroll/((count-1)*4))));
     await evaluate(tabId,scrollExpression(0));
@@ -457,7 +475,7 @@ async function bridgeSnapshotRenderedDOM({sweep=true}={}){
     .sort((a,b)=>b.scrollHeight-a.scrollHeight)[0];
   const oldNested=nested?.scrollTop||0;
   const visibleStates=new WeakMap();
-  const candidates=[...document.querySelectorAll('[data-reveal],[data-gsap],[data-animate],[data-animation],[data-aos],.reveal,.aos-init,[style*="opacity"]')].slice(0,2000);
+  const revealSelector='[data-reveal],[data-gsap],[data-animate],[data-animation],[data-aos],.reveal,.aos-init,[style*="opacity"]';
   const dimensions=()=>Math.max(root.scrollHeight,document.body?.scrollHeight||0,nested?.scrollHeight||0,innerHeight);
   let observed=0,canvases=0,unsupportedCanvases=0,videos=0;
   async function move(y){
@@ -467,8 +485,11 @@ async function bridgeSnapshotRenderedDOM({sweep=true}={}){
     else if(nested)nested.scrollTop=y;
     if(!nested||smoother||window.lenis)window.scrollTo({top:y,behavior:'instant'});
     window.ScrollTrigger?.update?.();
-    await sleep(115);
-    for(const el of candidates){
+    // A quick jump does not allow async widgets and IntersectionObserver
+    // transitions to resolve. Hold the viewport while content hydrates.
+    await sleep(620);
+    // Re-query: lazy sections often mount fresh nodes during the sweep.
+    for(const el of [...document.querySelectorAll(revealSelector)].slice(0,2500)){
       if(!el.isConnected)continue;
       const rect=el.getBoundingClientRect();
       if(rect.bottom<=0||rect.top>=innerHeight||rect.width<=0||rect.height<=0)continue;
@@ -481,11 +502,21 @@ async function bridgeSnapshotRenderedDOM({sweep=true}={}){
   }
   try{
     if(sweep){
-      const maxSteps=Math.min(96,Math.ceil(dimensions()/Math.max(320,innerHeight*.78)));
-      for(let i=0;i<=maxSteps;i++)await move(Math.min(i*Math.max(320,innerHeight*.78),dimensions()));
+      const step=Math.max(220,Math.floor(innerHeight*.55));
+      const maxSteps=Math.min(120,Math.ceil(dimensions()/step)+2);
+      for(let i=0;i<=maxSteps;i++){
+        const bottom=Math.max(0,dimensions()-innerHeight);
+        const target=Math.min(i*step,bottom);
+        await move(target);
+        if(target>=bottom)break;
+      }
       await move(oldY);
     }
-    await Promise.race([document.fonts?.ready||Promise.resolve(),sleep(1700)]);
+    await Promise.race([document.fonts?.ready||Promise.resolve(),sleep(2500)]);
+    // Wait for images actually triggered by the gradual sweep, not only fonts.
+    await Promise.race([Promise.all([...document.images].map(img=>img.complete?Promise.resolve():
+      new Promise(resolve=>{img.addEventListener('load',resolve,{once:true});
+        img.addEventListener('error',resolve,{once:true})}))),sleep(4000)]);
     const clone=root.cloneNode(true);
     const sourceElements=[root,...root.querySelectorAll('*')];
     const cloneElements=[clone,...clone.querySelectorAll('*')];
@@ -569,7 +600,11 @@ async function bridgeSnapshotRenderedDOM({sweep=true}={}){
     head.append(freeze);
     const html='<!doctype html>\n'+clone.outerHTML;
     if(html.length>12000000)throw Error('Rendered page exceeds the 12 MB capture limit. Capture smaller sections instead.');
-    return {html,source:location.href,nodes:sourceElements.length,observed,canvases,unsupportedCanvases,videos};
+    // Surface unresolved placeholders; not every spinner is caused by motion.
+    const unsettled=[...document.querySelectorAll('[aria-busy="true"],[class*="skeleton"],[class*="Skeleton"],[data-state="loading"]')]
+      .filter(el=>{const r=el.getBoundingClientRect(),st=getComputedStyle(el);
+        return r.width>0&&r.height>0&&st.display!=='none'&&st.visibility!=='hidden'}).length;
+    return {html,source:location.href,nodes:sourceElements.length,observed,canvases,unsupportedCanvases,videos,unsettled};
   }finally{
     try{
       if(nested)nested.scrollTop=oldNested;
@@ -605,7 +640,8 @@ captureRenderedButton?.addEventListener('click',async()=>{
       url:blobUrl,filename:'figma-bridge/'+host+'-rendered.html',saveAs:false,conflictAction:'uniquify'
     });
     if(typeof id!=='number')throw Error('Chrome did not start the HTML download.');
-    const warning=data.unsupportedCanvases?' '+data.unsupportedCanvases+' protected canvas(es) need PNG fallback.':'';
+    const warning=(data.unsupportedCanvases?' '+data.unsupportedCanvases+' protected canvas(es) need PNG fallback.':'')
+      +(data.unsettled?' '+data.unsettled+' loading placeholder(s) remained; inspect the source page or capture screenshots as a fallback.':'');
     setStatus('Rendered HTML download started ('+data.nodes+' DOM nodes). Import it in Bridge, then Copy to Figma.'+warning);
   }catch(error){
     setStatus('Rendered HTML capture failed: '+(error?.message||String(error)));

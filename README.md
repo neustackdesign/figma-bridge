@@ -71,6 +71,10 @@ Auto Layout is inferred by `@figit/dom-to-figma` for flex, grid, wrapping and bl
 
 The browser conversion engine is the MIT-licensed [`@figit/dom-to-figma`](https://github.com/figitdesign/web-to-figma) package rather than a Neustack reimplementation.
 
+### Gradual scroll preparation (v0.3.3)
+
+Chowdeck-like pages need the page to **actually visit and dwell on every section** before snapshots. Bridge now uses a progressive, overlapping page warm-up for full-page images and eight scene frames. Editable HTML capture also dwells at each step, rechecks late-mounted reveal nodes, and waits for triggered images. The source page scroll position is restored after capture. Capture does not guarantee remote API responses will succeed; any visible unresolved skeleton/loading placeholders are reported rather than represented as finished content. **Reload the unpacked Chrome extension** after upgrading. The plain **Website URL** input still retrieves static server HTML and will not execute the live website's JavaScript; use the companion for hydrated pages.
+
 ## Capture JavaScript-rendered pages for editable Figma import
 
 For pages such as Chowdeck that render content after load or use scroll-triggered reveals, use the Chrome companion's **Editable live-page capture → Download rendered HTML for Figma** action:
