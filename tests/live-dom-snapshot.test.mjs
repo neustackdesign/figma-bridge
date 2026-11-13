@@ -24,9 +24,15 @@ try{
     <canvas id="art" width="100" height="60"></canvas>
     <div id="moving">Animation</div>
     <div id="spacer"></div><div id="lazy" class="reveal">Loaded after scroll</div>
+    <p id="delayed">Still loading</p>
     <script>document.body.append(Object.assign(document.createElement('p'),{id:'hydrated',textContent:'Client-rendered content'}));
+      let started=false;
       addEventListener('scroll',()=>{
         document.getElementById('lazy').style.opacity=scrollY>80?'1':'0';
+        if(scrollY>1000&&!started){
+          started=true;
+          setTimeout(()=>{document.getElementById('delayed').textContent='Async content loaded';},470);
+        }
       });</script>
   </body></html>`);
   await page.evaluate(()=>{
@@ -43,6 +49,7 @@ try{
   assert.equal(captured.canvases,1);
   assert.equal(captured.unsupportedCanvases,0);
   assert.ok(captured.observed>0,'Scroll reveal should have been observed');
+  assert.match(captured.html,/Async content loaded/,'Gradual priming must wait for delayed near-footer content');
   assert.match(captured.html,/id="lazy"[^>]*style="[^"]*opacity:\s*1\s*!important/i,'Observed reveal must remain visible');
   assert.match(captured.html,/id="bridge-rendered-capture"/,'Motion is frozen in the static import');
   const scroll=await page.evaluate(()=>scrollY);
