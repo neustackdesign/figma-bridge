@@ -94,25 +94,39 @@ async function waitForIntro(tabId,allowVirtual=false){
 }
 
 async function primePage(tabId) {
-  const initial = await evaluate(tabId, dimensionsScript);
-  if (!initial || initial.height < 1 || initial.viewportHeight < 1) {
-    throw new Error('The page has no measurable viewport.');
+  const initial=await evaluate(tabId,dimensionsScript);
+  if(!initial||initial.height<1||initial.viewportHeight<1)
+    throw Error('The page has no measurable viewport.');
+  // Use a gradual, overlapping sweep. Large jumps miss IntersectionObserver
+  // reveals and async content that only mounts after sustained visibility.
+  const step=Math.max(180,Math.floor(initial.viewportHeight*.55));
+  const maxVisits=Math.min(MAX_TILES,120);
+  let y=0,visits=0,lastBottom=0;
+  try {
+    while(visits++<maxVisits){
+      const metrics=await evaluate(tabId,dimensionsScript);
+      const bottom=Math.max(0,Math.min(metrics.height-metrics.viewportHeight,150000));
+      const target=Math.min(y,bottom);
+      await evaluate(tabId,scrollExpression(target));
+      // scrollExpression itself waits 360ms. Additional dwell gives delayed
+      // section transitions, image loading and API-backed widgets a chance.
+      await wait(400);
+      const pending=await evaluate(tabId,'(() => {const visible=el=>{const r=el.getBoundingClientRect();return r.width>0&&r.height>0&&r.bottom>0&&r.top<innerHeight};return [...document.images].filter(img=>visible(img)&&!img.complete).length})()');
+      if(pending>0)await wait(700);
+      setStatus('Preparing animated and lazy sections… '+Math.min(100,Math.round(target/Math.max(1,bottom)*100))+'%');
+      lastBottom=bottom;
+      if(target>=bottom&&y>=bottom)break;
+      y+=step;
+    }
+    // Some requests start only after earlier lazy sections were visited.
+    await evaluate(tabId,'Promise.race([Promise.all([document.fonts?.ready||Promise.resolve(),...Array.from(document.images).map(img=>img.complete?Promise.resolve():new Promise(resolve=>{img.addEventListener("load",resolve,{once:true});img.addEventListener("error",resolve,{once:true})}))]),new Promise(resolve=>setTimeout(resolve,5000))]).then(()=>true)',7000);
+  }finally{
+    // Always restore the top before scene or tile capture, including failures.
+    await evaluate(tabId,scrollExpression(0));
+    await wait(550);
   }
-  const step = Math.max(260, Math.floor(initial.viewportHeight * 0.8));
-  let y = 0;
-  let visits = 0;
-  // Re-measure: lazy sections can grow the document as they become visible.
-  while (visits++ < MAX_TILES && y < Math.min((await evaluate(tabId, dimensionsScript)).height, 150000)) {
-    await evaluate(tabId, scrollExpression(y));
-    y += step;
-    setStatus(`Loading scroll content… ${Math.min(100,Math.round(y / Math.max(1,initial.height)*100))}%`);
-  }
-  await evaluate(tabId, `Promise.race([
-    Promise.all([document.fonts?.ready||Promise.resolve(),...Array.from(document.images).map(img=>img.complete?Promise.resolve():new Promise(r=>{img.addEventListener('load',r,{once:true});img.addEventListener('error',r,{once:true})}))]),
-    new Promise(r=>setTimeout(r,3500))
-  ]).then(()=>true)`, 6500);
-  await evaluate(tabId,scrollExpression(0));
-  return await evaluate(tabId,dimensionsScript);
+  const finalMetrics=await evaluate(tabId,dimensionsScript);
+  return {...finalMetrics,primedSections:visits,scrollRange:lastBottom};
 }
 
 async function screenshot(tabId) {
@@ -399,6 +413,10 @@ async function captureSceneFrames(){
     original=await evaluate(tabId,dimensionsScript);
     if(!original?.viewportWidth||!original?.viewportHeight)throw Error('Cannot measure this page.');
     await waitForIntro(tabId,true); // Retain virtual-scroll sequences but skip unfinished page loaders.
+    setStatus("Preparing the full page before scene capture…");
+    // Scene capture previously skipped the priming pass used by full-page
+    // screenshots, so lazy sections appeared as skeletons or empty regions.
+    original=await primePage(tabId);
     const count=8,maxScroll=Math.max(0,original.height-original.viewportHeight);
     const delta=Math.max(170,Math.min(700,Math.ceil(maxScroll/((count-1)*4))));
     await evaluate(tabId,scrollExpression(0));
