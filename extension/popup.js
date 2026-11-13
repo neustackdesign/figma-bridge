@@ -522,7 +522,7 @@ async function bridgeSnapshotRenderedDOM({sweep=true}={}){
   const visibleStates=new WeakMap();
   const revealSelector='[data-reveal],[data-gsap],[data-animate],[data-animation],[data-aos],.reveal,.aos-init,[style*="opacity"]';
   const dimensions=()=>Math.max(root.scrollHeight,document.body?.scrollHeight||0,nested?.scrollHeight||0,innerHeight);
-  let observed=0,canvases=0,unsupportedCanvases=0,videos=0;
+  let observed=0,canvases=0,unsupportedCanvases=0,videos=0,repairedSections=0,collapsedSections=0;
   async function move(y){
     const smoother=window.ScrollSmoother?.get?.();
     if(smoother)smoother.scrollTop(y,false);
@@ -540,8 +540,13 @@ async function bridgeSnapshotRenderedDOM({sweep=true}={}){
       if(rect.bottom<=0||rect.top>=innerHeight||rect.width<=0||rect.height<=0)continue;
       const cs=getComputedStyle(el);
       if(cs.visibility!=='hidden'&&Number(cs.opacity)>.85){
-        if(!visibleStates.has(el))observed++;
-        visibleStates.set(el,{transform:cs.transform});
+        const earlier=visibleStates.get(el);
+        if(!earlier)observed++;
+        // Remember the widest actually visible state, rather than merely
+        // the final state. Scroll-driven panels can contract to width:0
+        // after their pinned sequence finishes (as on Chowdeck).
+        if(!earlier||rect.width>earlier.width+1)
+          visibleStates.set(el,{transform:cs.transform,width:rect.width});
       }
     }
   }
@@ -620,6 +625,18 @@ async function bridgeSnapshotRenderedDOM({sweep=true}={}){
         copy.style.setProperty('visibility','visible','important');
         if(state.transform&&state.transform!=='none')copy.style.setProperty('transform',state.transform,'important');
       }
+      // Preserve a previously observed, expanded geometry if a content-heavy
+      // animated container has collapsed back to zero width at capture time.
+      // Do not invent a width when the sweep never saw it expanded.
+      const inlineWidth=(original instanceof HTMLElement?original.style.width:'').trim();
+      if(inlineWidth&&/^0(?:px|%|rem|em|vw)?$/.test(inlineWidth)
+          &&original.getBoundingClientRect().width<2
+          &&original.textContent?.trim().length>100){
+        if(state?.width>80){
+          copy.style.setProperty('width',state.width.toFixed(2)+'px','important');
+          repairedSections++;
+        }else collapsedSections++;
+      }
     }
     // Private input values and executable page code must never be exported.
     clone.querySelectorAll('script,noscript,iframe,object,embed,link[rel="preload"],link[rel="prefetch"],link[rel="preconnect"]').forEach(el=>el.remove());
@@ -649,7 +666,7 @@ async function bridgeSnapshotRenderedDOM({sweep=true}={}){
     const unsettled=[...document.querySelectorAll('[aria-busy="true"],[class*="skeleton"],[class*="Skeleton"],[data-state="loading"]')]
       .filter(el=>{const r=el.getBoundingClientRect(),st=getComputedStyle(el);
         return r.width>0&&r.height>0&&st.display!=='none'&&st.visibility!=='hidden'}).length;
-    return {html,source:location.href,nodes:sourceElements.length,observed,canvases,unsupportedCanvases,videos,unsettled};
+    return {html,source:location.href,nodes:sourceElements.length,observed,canvases,unsupportedCanvases,videos,unsettled,repairedSections,collapsedSections};
   }finally{
     try{
       if(nested)nested.scrollTop=oldNested;
@@ -686,7 +703,9 @@ captureRenderedButton?.addEventListener('click',async()=>{
     });
     if(typeof id!=='number')throw Error('Chrome did not start the HTML download.');
     const warning=(data.unsupportedCanvases?' '+data.unsupportedCanvases+' protected canvas(es) need PNG fallback.':'')
-      +(data.unsettled?' '+data.unsettled+' loading placeholder(s) remained; inspect the source page or capture screenshots as a fallback.':'');
+      +(data.unsettled?' '+data.unsettled+' loading placeholder(s) remained; inspect the source page or capture screenshots as a fallback.':'')
+      +(data.repairedSections?' Restored '+data.repairedSections+' observed expanded section(s).':'')
+      +(data.collapsedSections?' '+data.collapsedSections+' section(s) remained collapsed and need scene/image capture.':'');
     setStatus('Rendered HTML download started ('+data.nodes+' DOM nodes). Import it in Bridge, then Copy to Figma.'+warning);
   }catch(error){
     setStatus('Rendered HTML capture failed: '+(error?.message||String(error)));
