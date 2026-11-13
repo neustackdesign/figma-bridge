@@ -34,7 +34,7 @@ const sceneStart=popupScript.indexOf('async function captureSceneFrames()');
 const sceneEnd=popupScript.indexOf('if(sceneFramesButton)',sceneStart);
 assert.ok(primeStart>0&&primeEnd>primeStart&&sceneStart>0&&sceneEnd>sceneStart);
 assert.match(popupScript.slice(primeStart,primeEnd),/await wait\(400\)/,'priming must dwell at each scroll stop');
-assert.match(popupScript.slice(sceneStart,sceneEnd),/original=await primePage\(tabId\)/,'scene frames must run full-page priming before capturing');
+assert.match(popupScript.slice(sceneStart,sceneEnd),/const prepared=await primePage\(tabId\)/,'scene frames must run full-page priming before capturing while preserving initial scroll state');
 
 assert.match(popupScript,/Input.dispatchMouseEvent/);
 assert.match(popupScript,/waitForIntro/);
