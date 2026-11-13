@@ -11,6 +11,9 @@ on:
       - tests/web-export.smoke.mjs
       - tests/bundled-import.smoke.mjs
       - tests/animated-capture.test.mjs
+      - tests/live-dom-snapshot.test.mjs
+      - extension/popup.js
+      - extension/popup.html
       - .github/workflows/web-export.yml
   pull_request:
     paths:
@@ -20,6 +23,9 @@ on:
       - tests/web-export.smoke.mjs
       - tests/bundled-import.smoke.mjs
       - tests/animated-capture.test.mjs
+      - tests/live-dom-snapshot.test.mjs
+      - extension/popup.js
+      - extension/popup.html
       - .github/workflows/web-export.yml
   workflow_dispatch:
 permissions:
@@ -58,6 +64,7 @@ jobs:
           node tests/smart-scene-capture.test.mjs
           node tests/capture-ux.test.mjs
           node tests/motion-capture.test.mjs
+          node tests/live-dom-snapshot.test.mjs
           node tests/exporter-smoke.mjs
           node --test tests/analytics-consent.test.mjs tests/seo-smoke.mjs
       - name: Start isolated Bridge static app
