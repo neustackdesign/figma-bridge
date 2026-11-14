@@ -87,7 +87,8 @@ try{
       '<canvas id="mediaCanvas" class="w-full h-full" width="600" height="300" '+
       'style="opacity:0;visibility:hidden"></canvas></div>'+
       '<div class="video-container"><video id="noFrame" class="w-full h-full" '+
-      'style="opacity:0;visibility:hidden"></video></div></body></html>');
+      'style="opacity:0;visibility:hidden"></video></div>'+
+      '<div class="video-container"><video id="needsScreenshot" class="w-full h-full"></video></div></body></html>');
     const result=await mediaPage.evaluate(async source=>{
       const can=document.querySelector('#mediaCanvas');
       const ctx=can.getContext('2d');ctx.fillStyle='#e23511';ctx.fillRect(0,0,600,300);
@@ -101,13 +102,17 @@ try{
         count:imgs.length,videoCount:doc.querySelectorAll('video').length,
         styles:imgs.map(img=>img.getAttribute('style')||''),
         sources:imgs.map(img=>(img.getAttribute('src')||'').slice(0,40)),
-        errors:captured.error,unresolvedVideos:captured.unresolvedVideos
+        errors:captured.error,unresolvedVideos:captured.unresolvedVideos,
+        blankVideos:captured.blankVideos,
+        placeholder:doc.querySelector('img[alt="Captured video fallback"]')?.getAttribute('src')
       };
     },captureSource);
     assert.equal(result.errors,undefined,'Granola-style capture failed');
-    assert.equal(result.count,2,'Decoded canvas and undecoded video poster must survive');
+    assert.equal(result.count,3,'Canvas, video poster, and pending screenshot fallback must survive');
     assert.equal(result.videoCount,0,'Static output must not leave unrenderable video tags');
-    assert.equal(result.unresolvedVideos,0,'Video poster must resolve no-frame fallback');
+    assert.equal(result.unresolvedVideos,1,'Video with no frame or poster must be identified');
+    assert.equal(result.blankVideos.length,1,'Screenshot recovery job must be returned');
+    assert.match(result.placeholder||'',/^bridge-video:0$/,'Unresolved video should retain a screenshot placeholder');
     for(const style of result.styles){
       assert.match(style,/width:\s*100%/,'Media must remain responsive');
       assert.match(style,/height:\s*100%/,'Media must retain parent aspect geometry');
@@ -115,7 +120,7 @@ try{
       assert.match(style,/visibility:\s*visible\s*!important/,'Captured media must not stay hidden');
       assert.doesNotMatch(style,/width:\s*900px|width:\s*3120px/,'Captured viewport size must not be hard-coded');
     }
-    assert.ok(result.sources.every(src=>src.startsWith('data:image/png;base64,')),'Bitmap pixels or poster were lost');
+    assert.ok(result.sources.filter(src=>src.startsWith('data:image/png;base64,')).length===2,'Bitmap pixels or poster were lost');
   }finally{await mediaPage.close()}
 
   console.log('Live DOM snapshot regression passed: hydration, delayed loading, expanded geometry, fallback reporting, sanitization and restoration.');
