@@ -550,19 +550,35 @@ async function bridgeSnapshotRenderedDOM({sweep=true,maxSweepMs=45000}={}){
   // The page's CSS often targets the <video>/<canvas> tag or a playback
   // state (e.g. `.is-playing video`), so the replacement <img> would match
   // different rules and vanish. Bake in what was actually rendered.
-  const pinRendered=(image,original)=>{
-    const cs=getComputedStyle(original),seen=visibleStates.has(original);
+  // A decoded raster frame is independent of the old <video>/<canvas> state.
+  // The source video may become opacity:0 when scrolled offscreen or when a
+  // poster overlays it; copying that state onto an <img> silently loses pixels.
+  const pinRendered=(image,original,hasPixels=false)=>{
+    const cs=getComputedStyle(original),rect=original.getBoundingClientRect();
+    const liveBox=rect.width>1&&rect.height>1&&cs.display!=='none';
+    const forceVisible=hasPixels&&liveBox&&!original.closest('[hidden],[aria-hidden="true"]');
+    const seen=visibleStates.has(original);
     for(const prop of ['opacity','visibility','object-fit','object-position'])
       image.style.setProperty(prop,cs.getPropertyValue(prop),'important');
-    if(seen&&(Number(cs.opacity)<.85||cs.visibility==='hidden')){
+    if((seen||forceVisible)&&(Number(cs.opacity)<.85||cs.visibility==='hidden')){
       image.style.setProperty('opacity','1','important');
       image.style.setProperty('visibility','visible','important');
     }
+    image.dataset.bridgeCapturedMedia='true';
+  };
+  // Fixed pixel dimensions from the source 3,120px browser overflow the
+  // 1,440px Bridge preview. Keep responsive w-full / h-full sizing instead.
+  const sizeCapturedMedia=(image,original,box)=>{
+    const cls=typeof original.className==='string'?original.className:'';
+    const has=token=>cls.split(/\s+/).includes(token);
+    image.style.width=has('w-full')?'100%':(original.style.width||Math.max(1,box.width)+'px');
+    image.style.height=has('h-full')?'100%':has('h-lvh')?'100lvh':
+      (original.style.height||Math.max(1,box.height)+'px');
   };
   // Many sites hide/unload media once it leaves the viewport, so the frame
   // must be grabbed while it is on screen.
   const videoFrames=new WeakMap();
-  let observed=0,canvases=0,unsupportedCanvases=0,videos=0,repairedSections=0,collapsedSections=0,sweepPartial=false;
+  let observed=0,canvases=0,unsupportedCanvases=0,videos=0,unresolvedVideos=0,repairedSections=0,collapsedSections=0,sweepPartial=false;
   const budget=Math.min(45000,Math.max(1000,Number(maxSweepMs)||45000));
   async function move(y){
     const smoother=window.ScrollSmoother?.get?.();
@@ -667,8 +683,8 @@ async function bridgeSnapshotRenderedDOM({sweep=true,maxSweepMs=45000}={}){
           image.alt=original.getAttribute('aria-label')||'Captured canvas frame';
           image.className=copy.className||'';
           image.style.cssText=copy.style.cssText;
-          image.style.width=box.width+'px';image.style.height=box.height+'px';
-          pinRendered(image,original);
+          sizeCapturedMedia(image,original,box);
+          pinRendered(image,original,true);
           copy.replaceWith(image);canvases++;
         }catch{unsupportedCanvases++;}
         continue;
@@ -685,13 +701,27 @@ async function bridgeSnapshotRenderedDOM({sweep=true,maxSweepMs=45000}={}){
           image.style.cssText=copy.style.cssText;
           image.className=copy.className||'';
           image.alt=original.getAttribute('aria-label')||'Captured video frame';
-          image.style.width=box.width+'px';image.style.height=box.height+'px';
-          pinRendered(image,original);
+          sizeCapturedMedia(image,original,box);
+          pinRendered(image,original,true);
           copy.replaceWith(image);videos++;
           continue;
         }catch{}
-        // No frame ever decoded: keep the <video> (and its poster) and let the
-        // generic visibility handling below apply.
+        // An unresolved <video> is never useful to a static Figma converter.
+        // If the page supplies a poster, retain it as a static image. Otherwise
+        // report the missing pixels instead of silently exporting blank layers.
+        const poster=original.getAttribute('poster')||
+          original.parentElement?.querySelector('picture img')?.currentSrc||
+          original.parentElement?.querySelector('picture img')?.getAttribute('src');
+        if(poster&&poster!=='data:'){
+          const image=document.createElement('img');
+          image.src=poster;image.className=copy.className||'';
+          image.alt=original.getAttribute('aria-label')||'Captured video poster';
+          image.style.cssText=copy.style.cssText;
+          sizeCapturedMedia(image,original,box);
+          pinRendered(image,original,true);
+          copy.replaceWith(image);videos++;
+        }else{unresolvedVideos++;copy.remove();}
+        continue;
       }
       if(original instanceof HTMLImageElement&&original.currentSrc&&
           !original.currentSrc.startsWith('blob:')&&!original.currentSrc.startsWith('data:')){
@@ -760,7 +790,7 @@ async function bridgeSnapshotRenderedDOM({sweep=true,maxSweepMs=45000}={}){
     const unsettled=[...document.querySelectorAll('[aria-busy="true"],[class*="skeleton"],[class*="Skeleton"],[data-state="loading"]')]
       .filter(el=>{const r=el.getBoundingClientRect(),st=getComputedStyle(el);
         return r.width>0&&r.height>0&&st.display!=='none'&&st.visibility!=='hidden'}).length;
-    return {html,source:location.href,viewportWidth:innerWidth,viewportHeight:innerHeight,blankCanvases,nodes:sourceElements.length,observed,canvases,unsupportedCanvases,videos,unsettled,repairedSections,collapsedSections,sweepPartial};
+    return {html,source:location.href,viewportWidth:innerWidth,viewportHeight:innerHeight,blankCanvases,nodes:sourceElements.length,observed,canvases,unsupportedCanvases,videos,unresolvedVideos,unsettled,repairedSections,collapsedSections,sweepPartial};
   }catch(error){
     // executeScript drops exceptions (the popup only sees `undefined`), so
     // return the reason as data.
@@ -830,6 +860,7 @@ captureRenderedButton?.addEventListener('click',async()=>{
     });
     if(typeof id!=='number')throw Error('Chrome did not start the HTML download.');
     const warning=(data.unsupportedCanvases?' '+data.unsupportedCanvases+' protected canvas(es) need PNG fallback.':'')
+      +(data.unresolvedVideos?' '+data.unresolvedVideos+' video(s) had no decoded frame or poster; use Images capture for those sections.':'')
       +(data.unsettled?' '+data.unsettled+' loading placeholder(s) remained; inspect the source page or capture screenshots as a fallback.':'')
       +(data.repairedSections?' Restored '+data.repairedSections+' observed expanded section(s).':'')
       +(data.collapsedSections?' '+data.collapsedSections+' section(s) remained collapsed and need scene/image capture.':'')
