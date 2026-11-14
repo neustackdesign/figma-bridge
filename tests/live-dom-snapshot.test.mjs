@@ -121,6 +121,42 @@ try{
       assert.doesNotMatch(style,/width:\s*900px|width:\s*3120px/,'Captured viewport size must not be hard-coded');
     }
     assert.ok(result.sources.filter(src=>src.startsWith('data:image/png;base64,')).length===2,'Bitmap pixels or poster were lost');
+
+    // Exercise the fallback through a simulated Chrome screenshot, not just
+    // the placeholder. It must return actual embedded pixels to Figma.
+    const helperStart=popup.indexOf('async function fillMissingVideos(');
+    const helperEnd=popup.indexOf('\ncaptureRenderedButton?.',helperStart);
+    assert.ok(helperStart>0&&helperEnd>helperStart,'Video screenshot helper not found');
+    const helper=popup.slice(helperStart,helperEnd).trim();
+    const fallback=await mediaPage.evaluate(async source=>{
+      const screenshot=document.createElement('canvas');
+      screenshot.width=100;screenshot.height=100;
+      const ctx=screenshot.getContext('2d');
+      ctx.fillStyle='#d92b18';ctx.fillRect(0,0,100,100);
+      const image=screenshot.toDataURL('image/jpeg',.85);
+      const state={blankVideos:[{id:'bridge-video:0',index:2}],html:'<img src="bridge-video:0">',unresolvedVideos:1};
+      const old=window.chrome;
+      window.chrome={
+        scripting:{executeScript:async o=>{
+          if(o.args?.length===2)return [{result:true}];
+          if(o.args?.length===1)return [{result:{rect:{x:10,y:15,width:30,height:40},viewport:{width:100,height:100}}}];
+          return [{result:{x:0,y:0}}];
+        }},
+        tabs:{captureVisibleTab:async()=>image}
+      };
+      try{
+        const restore=Function('return ('+source+')')();
+        const failures=await restore({id:1,windowId:1},state);
+        return {failures,recovered:state.recoveredVideos,unresolved:state.unresolvedVideos,
+          hasJpeg:state.html.includes('src="data:image/jpeg;base64,'),
+          length:state.html.length};
+      }finally{window.chrome=old}
+    },helper);
+    assert.equal(fallback.failures,0,'Live-tab media screenshot fallback failed');
+    assert.equal(fallback.recovered,1,'Fallback screenshot not counted as recovered');
+    assert.equal(fallback.unresolved,0,'Recovered media must not be reported missing');
+    assert.ok(fallback.hasJpeg&&fallback.length>300,'Actual image pixels must replace the video placeholder');
+
   }finally{await mediaPage.close()}
 
   console.log('Live DOM snapshot regression passed: hydration, delayed loading, expanded geometry, fallback reporting, sanitization and restoration.');
