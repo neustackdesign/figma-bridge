@@ -75,6 +75,49 @@ try{
   assert.equal(bounded.sweepPartial,true,'A tight safety budget must report incomplete preparation');
   assert.equal(await page.evaluate(()=>scrollY),0,'Timed-out preparation must restore the source scroll position');
 
+
+  // Real Granola capture regression: old code copied 3,120px widths and
+  // opacity:0/visibility:hidden onto media raster substitutes. When Bridge
+  // reopened the page at 1,440px, artwork disappeared or overflowed.
+  const mediaPage=await browser.newPage({viewport:{width:900,height:650}});
+  try{
+    await mediaPage.setContent('<!doctype html><html><head><style>'+
+      '.w-full{width:100%}.h-full{height:100%}.video-container{width:80%;height:260px;position:relative}'+
+      '</style></head><body><div class="video-container">'+
+      '<canvas id="mediaCanvas" class="w-full h-full" width="600" height="300" '+
+      'style="opacity:0;visibility:hidden"></canvas></div>'+
+      '<div class="video-container"><video id="noFrame" class="w-full h-full" '+
+      'style="opacity:0;visibility:hidden"></video></div></body></html>');
+    const result=await mediaPage.evaluate(async source=>{
+      const can=document.querySelector('#mediaCanvas');
+      const ctx=can.getContext('2d');ctx.fillStyle='#e23511';ctx.fillRect(0,0,600,300);
+      const vid=document.querySelector('#noFrame');
+      vid.poster=can.toDataURL('image/png');
+      const captured=await (0,eval)('('+source+')')({sweep:false});
+      const doc=new DOMParser().parseFromString(captured.html,'text/html');
+      const image=doc.querySelector('img[data-bridge-captured-media]');
+      const imgs=[...doc.querySelectorAll('img[data-bridge-captured-media]')];
+      return {
+        count:imgs.length,videoCount:doc.querySelectorAll('video').length,
+        styles:imgs.map(img=>img.getAttribute('style')||''),
+        sources:imgs.map(img=>(img.getAttribute('src')||'').slice(0,40)),
+        errors:captured.error,unresolvedVideos:captured.unresolvedVideos
+      };
+    },captureSource);
+    assert.equal(result.errors,undefined,'Granola-style capture failed');
+    assert.equal(result.count,2,'Decoded canvas and undecoded video poster must survive');
+    assert.equal(result.videoCount,0,'Static output must not leave unrenderable video tags');
+    assert.equal(result.unresolvedVideos,0,'Video poster must resolve no-frame fallback');
+    for(const style of result.styles){
+      assert.match(style,/width:\s*100%/,'Media must remain responsive');
+      assert.match(style,/height:\s*100%/,'Media must retain parent aspect geometry');
+      assert.match(style,/opacity:\s*1\s*!important/,'Captured media must be visible');
+      assert.match(style,/visibility:\s*visible\s*!important/,'Captured media must not stay hidden');
+      assert.doesNotMatch(style,/width:\s*900px|width:\s*3120px/,'Captured viewport size must not be hard-coded');
+    }
+    assert.ok(result.sources.every(src=>src.startsWith('data:image/png;base64,')),'Bitmap pixels or poster were lost');
+  }finally{await mediaPage.close()}
+
   console.log('Live DOM snapshot regression passed: hydration, delayed loading, expanded geometry, fallback reporting, sanitization and restoration.');
 }finally{
   await browser.close();
