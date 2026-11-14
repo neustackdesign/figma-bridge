@@ -529,6 +529,39 @@ async function bridgeSnapshotRenderedDOM({sweep=true,maxSweepMs=45000}={}){
   const visibleStates=new WeakMap();
   const revealSelector='[data-reveal],[data-gsap],[data-animate],[data-animation],[data-aos],.reveal,.aos-init,[style*="opacity"]';
   const dimensions=()=>Math.max(root.scrollHeight,document.body?.scrollHeight||0,nested?.scrollHeight||0,innerHeight);
+  // Rasterize at the rendered size (≤2× DPR), not the intrinsic size: a 4K
+  // video frame as PNG alone can exceed the whole capture budget.
+  const rasterize=(source,srcWidth,srcHeight,box,mime)=>{
+    const ratio=Math.min(devicePixelRatio||1,2);
+    const scale=Math.min(1,(box.width*ratio)/srcWidth||1,(box.height*ratio)/srcHeight||1);
+    const frame=document.createElement('canvas');
+    frame.width=Math.max(1,Math.round(srcWidth*scale));frame.height=Math.max(1,Math.round(srcHeight*scale));
+    frame.getContext('2d').drawImage(source,0,0,frame.width,frame.height);
+    return frame.toDataURL(mime,.85);
+  };
+  // WebGL canvases read back fully transparent once their frame is composited.
+  const isBlank=source=>{
+    const probe=document.createElement('canvas');probe.width=probe.height=16;
+    const ctx=probe.getContext('2d',{willReadFrequently:true});ctx.drawImage(source,0,0,16,16);
+    return ctx.getImageData(0,0,16,16).data.every((value,i)=>i%4!==3||value===0);
+  };
+  // Canvases the page will not let us read are screenshotted by the popup.
+  const blankCanvases=[];
+  // The page's CSS often targets the <video>/<canvas> tag or a playback
+  // state (e.g. `.is-playing video`), so the replacement <img> would match
+  // different rules and vanish. Bake in what was actually rendered.
+  const pinRendered=(image,original)=>{
+    const cs=getComputedStyle(original),seen=visibleStates.has(original);
+    for(const prop of ['opacity','visibility','object-fit','object-position'])
+      image.style.setProperty(prop,cs.getPropertyValue(prop),'important');
+    if(seen&&(Number(cs.opacity)<.85||cs.visibility==='hidden')){
+      image.style.setProperty('opacity','1','important');
+      image.style.setProperty('visibility','visible','important');
+    }
+  };
+  // Many sites hide/unload media once it leaves the viewport, so the frame
+  // must be grabbed while it is on screen.
+  const videoFrames=new WeakMap();
   let observed=0,canvases=0,unsupportedCanvases=0,videos=0,repairedSections=0,collapsedSections=0,sweepPartial=false;
   const budget=Math.min(45000,Math.max(1000,Number(maxSweepMs)||45000));
   async function move(y){
@@ -542,7 +575,18 @@ async function bridgeSnapshotRenderedDOM({sweep=true,maxSweepMs=45000}={}){
     // transitions to resolve. Hold the viewport while content hydrates.
     await sleep(620);
     // Re-query: lazy sections often mount fresh nodes during the sweep.
-    for(const el of [...document.querySelectorAll(revealSelector)].slice(0,2500)){
+    // Media (and the wrappers that fade it) is commonly hidden by class when
+    // off screen, which revealSelector cannot see.
+    const candidates=new Set([...document.querySelectorAll(revealSelector)].slice(0,2500));
+    for(const media of [...document.querySelectorAll('img,picture,video,canvas,svg')].slice(0,800)){
+      for(let el=media,depth=0;el&&el!==document.body&&depth<4;el=el.parentElement,depth++)candidates.add(el);
+      if(media instanceof HTMLVideoElement&&!videoFrames.has(media)&&media.readyState>=2&&media.videoWidth){
+        const rect=media.getBoundingClientRect();
+        if(rect.bottom>0&&rect.top<innerHeight&&rect.width>0)
+          try{videoFrames.set(media,rasterize(media,media.videoWidth,media.videoHeight,rect,'image/jpeg'));}catch{}
+      }
+    }
+    for(const el of candidates){
       if(!el.isConnected)continue;
       const rect=el.getBoundingClientRect();
       if(rect.bottom<=0||rect.top>=innerHeight||rect.width<=0||rect.height<=0)continue;
@@ -580,6 +624,29 @@ async function bridgeSnapshotRenderedDOM({sweep=true,maxSweepMs=45000}={}){
     await Promise.race([Promise.all([...document.images].map(img=>img.complete?Promise.resolve():
       new Promise(resolve=>{img.addEventListener('load',resolve,{once:true});
         img.addEventListener('error',resolve,{once:true})}))),sleep(4000)]);
+    // Self-hosted fonts rarely send CORS headers, so they fail to load once the
+    // capture is opened from Bridge's origin. Embed the faces this page loaded.
+    const fontCss=[];
+    try{
+      const loaded=new Set(performance.getEntriesByType('resource').map(entry=>entry.name));
+      let budget=6000000;
+      for(const sheet of document.styleSheets){
+        let rules;try{rules=sheet.cssRules;}catch{continue;}
+        for(const rule of rules){
+          if(!(rule instanceof CSSFontFaceRule))continue;
+          const urls=[...rule.style.getPropertyValue('src').matchAll(/url\(\s*["']?([^"')]+)["']?\s*\)/g)]
+            .map(match=>{try{return new URL(match[1],sheet.href||location.href).href;}catch{return '';}});
+          const url=urls.find(href=>loaded.has(href));
+          if(!url)continue;
+          try{
+            const blob=await (await fetch(url)).blob();
+            if(!blob.size||(budget-=blob.size*1.37)<0)continue;
+            const data=await new Promise(resolve=>{const reader=new FileReader();reader.onload=()=>resolve(reader.result);reader.onerror=()=>resolve('');reader.readAsDataURL(blob);});
+            if(data)fontCss.push(rule.cssText.replace(/src\s*:[^;}]+/,'src: url("'+data+'")'));
+          }catch{}
+        }
+      }
+    }catch{}
     const clone=root.cloneNode(true);
     const sourceElements=[root,...root.querySelectorAll('*')];
     const cloneElements=[clone,...clone.querySelectorAll('*')];
@@ -589,33 +656,42 @@ async function bridgeSnapshotRenderedDOM({sweep=true,maxSweepMs=45000}={}){
       if(!copy||!original.isConnected)continue;
       if(original instanceof HTMLCanvasElement){
         try{
-          const url=original.toDataURL('image/png');
-          if(url==='data:,')throw Error('Canvas has no pixels');
-          const image=document.createElement('img');
+          if(!original.width||!original.height)throw Error('Canvas has no pixels');
           const box=original.getBoundingClientRect();
-          image.src=url;image.alt=original.getAttribute('aria-label')||'Captured canvas frame';
+          const image=document.createElement('img');
+          if(isBlank(original)){
+            const id='bridge-canvas:'+blankCanvases.length;
+            blankCanvases.push({id,x:box.left,y:box.top,width:box.width,height:box.height});
+            image.src=id;
+          }else image.src=rasterize(original,original.width,original.height,box,'image/png');
+          image.alt=original.getAttribute('aria-label')||'Captured canvas frame';
           image.className=copy.className||'';
           image.style.cssText=copy.style.cssText;
           image.style.width=box.width+'px';image.style.height=box.height+'px';
+          pinRendered(image,original);
           copy.replaceWith(image);canvases++;
         }catch{unsupportedCanvases++;}
         continue;
       }
-      if(original instanceof HTMLVideoElement&&original.readyState>=2&&original.videoWidth&&original.videoHeight){
-        try{
-          const frame=document.createElement('canvas');
-          frame.width=original.videoWidth;frame.height=original.videoHeight;
-          frame.getContext('2d').drawImage(original,0,0);
+      if(original instanceof HTMLVideoElement){
+        const box=original.getBoundingClientRect();
+        let src=null;
+        if(original.readyState>=2&&original.videoWidth)
+          try{src=rasterize(original,original.videoWidth,original.videoHeight,box,'image/jpeg');}catch{}
+        src=src||videoFrames.get(original);
+        if(src)try{
           const image=document.createElement('img');
-          image.src=frame.toDataURL('image/png');
-          const box=original.getBoundingClientRect();
+          image.src=src;
           image.style.cssText=copy.style.cssText;
           image.className=copy.className||'';
           image.alt=original.getAttribute('aria-label')||'Captured video frame';
           image.style.width=box.width+'px';image.style.height=box.height+'px';
+          pinRendered(image,original);
           copy.replaceWith(image);videos++;
+          continue;
         }catch{}
-        continue;
+        // No frame ever decoded: keep the <video> (and its poster) and let the
+        // generic visibility handling below apply.
       }
       if(original instanceof HTMLImageElement&&original.currentSrc&&
           !original.currentSrc.startsWith('blob:')&&!original.currentSrc.startsWith('data:')){
@@ -673,13 +749,22 @@ async function bridgeSnapshotRenderedDOM({sweep=true,maxSweepMs=45000}={}){
     freeze.id='bridge-rendered-capture';
     freeze.textContent='html{scroll-behavior:auto!important}*,*::before,*::after{animation:none!important;transition:none!important;caret-color:transparent!important}';
     head.append(freeze);
+    if(fontCss.length){
+      const fonts=document.createElement('style');
+      fonts.id='bridge-inline-fonts';fonts.textContent=fontCss.join('\n');
+      head.append(fonts);
+    }
     const html='<!doctype html>\n'+clone.outerHTML;
     if(html.length>12000000)throw Error('Rendered page exceeds the 12 MB capture limit. Capture smaller sections instead.');
     // Surface unresolved placeholders; not every spinner is caused by motion.
     const unsettled=[...document.querySelectorAll('[aria-busy="true"],[class*="skeleton"],[class*="Skeleton"],[data-state="loading"]')]
       .filter(el=>{const r=el.getBoundingClientRect(),st=getComputedStyle(el);
         return r.width>0&&r.height>0&&st.display!=='none'&&st.visibility!=='hidden'}).length;
-    return {html,source:location.href,nodes:sourceElements.length,observed,canvases,unsupportedCanvases,videos,unsettled,repairedSections,collapsedSections,sweepPartial};
+    return {html,source:location.href,viewportWidth:innerWidth,viewportHeight:innerHeight,blankCanvases,nodes:sourceElements.length,observed,canvases,unsupportedCanvases,videos,unsettled,repairedSections,collapsedSections,sweepPartial};
+  }catch(error){
+    // executeScript drops exceptions (the popup only sees `undefined`), so
+    // return the reason as data.
+    return {error:String(error?.message||error)};
   }finally{
     try{
       if(nested)nested.scrollTop=oldNested;
@@ -692,6 +777,30 @@ async function bridgeSnapshotRenderedDOM({sweep=true,maxSweepMs=45000}={}){
   }
 }
 const captureRenderedButton=document.getElementById('captureRendered');
+/** Replace `bridge-canvas:N` placeholders with crops of a real tab screenshot
+ * taken with everything except canvases hidden. Returns how many were missed. */
+async function fillBlankCanvases(tab,data){
+  const transparent='data:image/gif;base64,R0lGODlhAQABAAAAACH5BAEKAAEALAAAAAABAAEAAAICTAEAOw==';
+  const css='*{visibility:hidden!important}canvas{visibility:visible!important}';
+  const urls={};
+  const onScreen=data.blankCanvases.filter(c=>c.width>1&&c.height>1&&c.x<data.viewportWidth&&c.y<data.viewportHeight&&c.x+c.width>0&&c.y+c.height>0);
+  if(onScreen.length)try{
+    await chrome.scripting.insertCSS({target:{tabId:tab.id},css});
+    let shot;
+    try{await wait(200);shot=await chrome.tabs.captureVisibleTab(tab.windowId,{format:'png'});}
+    finally{await chrome.scripting.removeCSS({target:{tabId:tab.id},css}).catch(()=>{});}
+    const bitmap=await createImageBitmap(await (await fetch(shot)).blob());
+    const scale=bitmap.width/data.viewportWidth;
+    for(const c of onScreen){
+      const crop=document.createElement('canvas');
+      crop.width=Math.round(c.width*scale);crop.height=Math.round(c.height*scale);
+      crop.getContext('2d').drawImage(bitmap,c.x*scale,c.y*scale,crop.width,crop.height,0,0,crop.width,crop.height);
+      urls[c.id]=crop.toDataURL('image/jpeg',.88);
+    }
+  }catch{} // A missing screenshot only leaves those canvases transparent.
+  for(const c of data.blankCanvases)data.html=data.html.replace('src="'+c.id+'"','src="'+(urls[c.id]||transparent)+'"');
+  return data.blankCanvases.filter(c=>!urls[c.id]).length;
+}
 captureRenderedButton?.addEventListener('click',async()=>{
   if(running)return;
   running=true;captureRenderedButton.disabled=true;
@@ -707,7 +816,12 @@ captureRenderedButton?.addEventListener('click',async()=>{
       args:[{sweep:document.getElementById('sweepRendered')?.checked!==false}]
     });
     const data=output?.[0]?.result;
+    if(data?.error)throw Error(data.error);
     if(!data?.html)throw Error('The tab did not return a rendered document.');
+    if(data.blankCanvases.length){
+      setStatus('Capturing WebGL/protected canvas pixels…');
+      data.unsupportedCanvases+=await fillBlankCanvases(tab,data);
+    }
     const blob=new Blob([data.html],{type:'text/html;charset=utf-8'});
     blobUrl=URL.createObjectURL(blob);
     const host=new URL(data.source).hostname.replace(/[^a-z0-9.-]/gi,'-');
