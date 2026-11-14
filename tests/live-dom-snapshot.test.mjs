@@ -75,6 +75,90 @@ try{
   assert.equal(bounded.sweepPartial,true,'A tight safety budget must report incomplete preparation');
   assert.equal(await page.evaluate(()=>scrollY),0,'Timed-out preparation must restore the source scroll position');
 
+
+  // Real Granola capture regression: old code copied 3,120px widths and
+  // opacity:0/visibility:hidden onto media raster substitutes. When Bridge
+  // reopened the page at 1,440px, artwork disappeared or overflowed.
+  const mediaPage=await browser.newPage({viewport:{width:900,height:650}});
+  try{
+    await mediaPage.setContent('<!doctype html><html><head><style>'+
+      '.w-full{width:100%}.h-full{height:100%}.video-container{width:80%;height:260px;position:relative}'+
+      '</style></head><body><div class="video-container">'+
+      '<canvas id="mediaCanvas" class="w-full h-full" width="600" height="300" '+
+      'style="opacity:0;visibility:hidden"></canvas></div>'+
+      '<div class="video-container"><video id="noFrame" class="w-full h-full" '+
+      'style="opacity:0;visibility:hidden"></video></div>'+
+      '<div class="video-container"><video id="needsScreenshot" class="w-full h-full"></video></div></body></html>');
+    const result=await mediaPage.evaluate(async source=>{
+      const can=document.querySelector('#mediaCanvas');
+      const ctx=can.getContext('2d');ctx.fillStyle='#e23511';ctx.fillRect(0,0,600,300);
+      const vid=document.querySelector('#noFrame');
+      vid.poster=can.toDataURL('image/png');
+      const captured=await (0,eval)('('+source+')')({sweep:false});
+      const doc=new DOMParser().parseFromString(captured.html,'text/html');
+      const image=doc.querySelector('img[data-bridge-captured-media]');
+      const imgs=[...doc.querySelectorAll('img[data-bridge-captured-media]')];
+      return {
+        count:imgs.length,videoCount:doc.querySelectorAll('video').length,
+        styles:imgs.map(img=>img.getAttribute('style')||''),
+        sources:imgs.map(img=>(img.getAttribute('src')||'').slice(0,40)),
+        errors:captured.error,unresolvedVideos:captured.unresolvedVideos,
+        blankVideos:captured.blankVideos,
+        placeholder:doc.querySelector('img[alt="Captured video fallback"]')?.getAttribute('src')
+      };
+    },captureSource);
+    assert.equal(result.errors,undefined,'Granola-style capture failed');
+    assert.equal(result.count,3,'Canvas, video poster, and pending screenshot fallback must survive');
+    assert.equal(result.videoCount,0,'Static output must not leave unrenderable video tags');
+    assert.equal(result.unresolvedVideos,1,'Video with no frame or poster must be identified');
+    assert.equal(result.blankVideos.length,1,'Screenshot recovery job must be returned');
+    assert.match(result.placeholder||'',/^bridge-video:0$/,'Unresolved video should retain a screenshot placeholder');
+    for(const style of result.styles){
+      assert.match(style,/width:\s*100%/,'Media must remain responsive');
+      assert.match(style,/height:\s*100%/,'Media must retain parent aspect geometry');
+      assert.match(style,/opacity:\s*1\s*!important/,'Captured media must be visible');
+      assert.match(style,/visibility:\s*visible\s*!important/,'Captured media must not stay hidden');
+      assert.doesNotMatch(style,/width:\s*900px|width:\s*3120px/,'Captured viewport size must not be hard-coded');
+    }
+    assert.ok(result.sources.filter(src=>src.startsWith('data:image/png;base64,')).length===2,'Bitmap pixels or poster were lost');
+
+    // Exercise the fallback through a simulated Chrome screenshot, not just
+    // the placeholder. It must return actual embedded pixels to Figma.
+    const helperStart=popup.indexOf('async function fillMissingVideos(');
+    const helperEnd=popup.indexOf('\ncaptureRenderedButton?.',helperStart);
+    assert.ok(helperStart>0&&helperEnd>helperStart,'Video screenshot helper not found');
+    const helper=popup.slice(helperStart,helperEnd).trim();
+    const fallback=await mediaPage.evaluate(async source=>{
+      const screenshot=document.createElement('canvas');
+      screenshot.width=100;screenshot.height=100;
+      const ctx=screenshot.getContext('2d');
+      ctx.fillStyle='#d92b18';ctx.fillRect(0,0,100,100);
+      const image=screenshot.toDataURL('image/jpeg',.85);
+      const state={blankVideos:[{id:'bridge-video:0',index:2}],html:'<img src="bridge-video:0">',unresolvedVideos:1};
+      const old=window.chrome;
+      window.chrome={
+        scripting:{executeScript:async o=>{
+          if(o.args?.length===2)return [{result:true}];
+          if(o.args?.length===1)return [{result:{rect:{x:10,y:15,width:30,height:40},viewport:{width:100,height:100}}}];
+          return [{result:{x:0,y:0}}];
+        }},
+        tabs:{captureVisibleTab:async()=>image}
+      };
+      try{
+        const restore=Function('return ('+source+')')();
+        const failures=await restore({id:1,windowId:1},state);
+        return {failures,recovered:state.recoveredVideos,unresolved:state.unresolvedVideos,
+          hasJpeg:state.html.includes('src="data:image/jpeg;base64,'),
+          length:state.html.length};
+      }finally{window.chrome=old}
+    },helper);
+    assert.equal(fallback.failures,0,'Live-tab media screenshot fallback failed');
+    assert.equal(fallback.recovered,1,'Fallback screenshot not counted as recovered');
+    assert.equal(fallback.unresolved,0,'Recovered media must not be reported missing');
+    assert.ok(fallback.hasJpeg&&fallback.length>300,'Actual image pixels must replace the video placeholder');
+
+  }finally{await mediaPage.close()}
+
   console.log('Live DOM snapshot regression passed: hydration, delayed loading, expanded geometry, fallback reporting, sanitization and restoration.');
 }finally{
   await browser.close();

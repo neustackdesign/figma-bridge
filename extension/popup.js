@@ -550,19 +550,36 @@ async function bridgeSnapshotRenderedDOM({sweep=true,maxSweepMs=45000}={}){
   // The page's CSS often targets the <video>/<canvas> tag or a playback
   // state (e.g. `.is-playing video`), so the replacement <img> would match
   // different rules and vanish. Bake in what was actually rendered.
-  const pinRendered=(image,original)=>{
-    const cs=getComputedStyle(original),seen=visibleStates.has(original);
+  // A decoded raster frame is independent of the old <video>/<canvas> state.
+  // The source video may become opacity:0 when scrolled offscreen or when a
+  // poster overlays it; copying that state onto an <img> silently loses pixels.
+  const pinRendered=(image,original,hasPixels=false)=>{
+    const cs=getComputedStyle(original),rect=original.getBoundingClientRect();
+    const liveBox=rect.width>1&&rect.height>1&&cs.display!=='none';
+    const forceVisible=hasPixels&&liveBox&&!original.closest('[hidden],[aria-hidden="true"]');
+    const seen=visibleStates.has(original);
     for(const prop of ['opacity','visibility','object-fit','object-position'])
       image.style.setProperty(prop,cs.getPropertyValue(prop),'important');
-    if(seen&&(Number(cs.opacity)<.85||cs.visibility==='hidden')){
+    if((seen||forceVisible)&&(Number(cs.opacity)<.85||cs.visibility==='hidden')){
       image.style.setProperty('opacity','1','important');
       image.style.setProperty('visibility','visible','important');
     }
+    image.dataset.bridgeCapturedMedia='true';
+  };
+  // Fixed pixel dimensions from the source 3,120px browser overflow the
+  // 1,440px Bridge preview. Keep responsive w-full / h-full sizing instead.
+  const sizeCapturedMedia=(image,original,box)=>{
+    const cls=typeof original.className==='string'?original.className:'';
+    const has=token=>cls.split(/\s+/).includes(token);
+    image.style.width=has('w-full')?'100%':(original.style.width||Math.max(1,box.width)+'px');
+    image.style.height=has('h-full')?'100%':has('h-lvh')?'100lvh':
+      (original.style.height||Math.max(1,box.height)+'px');
   };
   // Many sites hide/unload media once it leaves the viewport, so the frame
   // must be grabbed while it is on screen.
   const videoFrames=new WeakMap();
-  let observed=0,canvases=0,unsupportedCanvases=0,videos=0,repairedSections=0,collapsedSections=0,sweepPartial=false;
+  const blankVideos=[];
+  let observed=0,canvases=0,unsupportedCanvases=0,videos=0,unresolvedVideos=0,repairedSections=0,collapsedSections=0,sweepPartial=false;
   const budget=Math.min(45000,Math.max(1000,Number(maxSweepMs)||45000));
   async function move(y){
     const smoother=window.ScrollSmoother?.get?.();
@@ -667,8 +684,8 @@ async function bridgeSnapshotRenderedDOM({sweep=true,maxSweepMs=45000}={}){
           image.alt=original.getAttribute('aria-label')||'Captured canvas frame';
           image.className=copy.className||'';
           image.style.cssText=copy.style.cssText;
-          image.style.width=box.width+'px';image.style.height=box.height+'px';
-          pinRendered(image,original);
+          sizeCapturedMedia(image,original,box);
+          pinRendered(image,original,true);
           copy.replaceWith(image);canvases++;
         }catch{unsupportedCanvases++;}
         continue;
@@ -685,13 +702,40 @@ async function bridgeSnapshotRenderedDOM({sweep=true,maxSweepMs=45000}={}){
           image.style.cssText=copy.style.cssText;
           image.className=copy.className||'';
           image.alt=original.getAttribute('aria-label')||'Captured video frame';
-          image.style.width=box.width+'px';image.style.height=box.height+'px';
-          pinRendered(image,original);
+          sizeCapturedMedia(image,original,box);
+          pinRendered(image,original,true);
           copy.replaceWith(image);videos++;
           continue;
         }catch{}
-        // No frame ever decoded: keep the <video> (and its poster) and let the
-        // generic visibility handling below apply.
+        // An unresolved <video> is never useful to a static Figma converter.
+        // If the page supplies a poster, retain it as a static image. Otherwise
+        // report the missing pixels instead of silently exporting blank layers.
+        const poster=original.getAttribute('poster')||
+          original.parentElement?.querySelector('picture img')?.currentSrc||
+          original.parentElement?.querySelector('picture img')?.getAttribute('src');
+        if(poster&&poster!=='data:'){
+          const image=document.createElement('img');
+          image.src=poster;image.className=copy.className||'';
+          image.alt=original.getAttribute('aria-label')||'Captured video poster';
+          image.style.cssText=copy.style.cssText;
+          sizeCapturedMedia(image,original,box);
+          pinRendered(image,original,true);
+          copy.replaceWith(image);videos++;
+        }else{
+          // If the video never decoded, leave a raster placeholder. The popup
+          // tries a visible-tab pixel fallback at this element's original index
+          // after the snapshot function has finished restoring scroll state.
+          const id='bridge-video:'+blankVideos.length;
+          const image=document.createElement('img');
+          image.src=id;image.className=copy.className||'';
+          image.alt='Captured video fallback';
+          image.style.cssText=copy.style.cssText;
+          sizeCapturedMedia(image,original,box);
+          pinRendered(image,original,true);
+          blankVideos.push({id,index:[...document.querySelectorAll('video')].indexOf(original)});
+          copy.replaceWith(image);unresolvedVideos++;
+        }
+        continue;
       }
       if(original instanceof HTMLImageElement&&original.currentSrc&&
           !original.currentSrc.startsWith('blob:')&&!original.currentSrc.startsWith('data:')){
@@ -760,7 +804,7 @@ async function bridgeSnapshotRenderedDOM({sweep=true,maxSweepMs=45000}={}){
     const unsettled=[...document.querySelectorAll('[aria-busy="true"],[class*="skeleton"],[class*="Skeleton"],[data-state="loading"]')]
       .filter(el=>{const r=el.getBoundingClientRect(),st=getComputedStyle(el);
         return r.width>0&&r.height>0&&st.display!=='none'&&st.visibility!=='hidden'}).length;
-    return {html,source:location.href,viewportWidth:innerWidth,viewportHeight:innerHeight,blankCanvases,nodes:sourceElements.length,observed,canvases,unsupportedCanvases,videos,unsettled,repairedSections,collapsedSections,sweepPartial};
+    return {html,source:location.href,viewportWidth:innerWidth,viewportHeight:innerHeight,blankCanvases,blankVideos,nodes:sourceElements.length,observed,canvases,unsupportedCanvases,videos,unresolvedVideos,unsettled,repairedSections,collapsedSections,sweepPartial};
   }catch(error){
     // executeScript drops exceptions (the popup only sees `undefined`), so
     // return the reason as data.
@@ -801,6 +845,97 @@ async function fillBlankCanvases(tab,data){
   for(const c of data.blankCanvases)data.html=data.html.replace('src="'+c.id+'"','src="'+(urls[c.id]||transparent)+'"');
   return data.blankCanvases.filter(c=>!urls[c.id]).length;
 }
+
+/** Browser-native fallback for video elements that couldn't be read as a
+ * decoded canvas frame. Capture the video while scrolled into view; if the
+ * video API stays unavailable, crop its actual composited pixels from Chrome.
+ * Limit the work so a problematic site cannot trap the extension popup. */
+async function fillMissingVideos(tab,data){
+  const transparent='data:image/gif;base64,R0lGODlhAQABAAAAACH5BAEKAAEALAAAAAABAAEAAAICTAEAOw==';
+  const jobs=(data.blankVideos||[]).slice(0,12);
+  let failures=0,recovered=0;
+  const begin=await chrome.scripting.executeScript({
+    target:{tabId:tab.id},world:'MAIN',
+    func:()=>({x:window.scrollX,y:window.scrollY})
+  }).then(x=>x?.[0]?.result).catch(()=>null);
+  try{
+    for(const item of jobs){
+      let src='';
+      try{
+        const result=await chrome.scripting.executeScript({
+          target:{tabId:tab.id},world:'MAIN',args:[item.index],
+          func:async index=>{
+            const video=document.querySelectorAll('video')[index];
+            if(!video)return null;
+            if(window.lenis?.scrollTo)window.lenis.scrollTo(video,{immediate:true,force:true});
+            else if(window.ScrollSmoother?.get?.())window.ScrollSmoother.get().scrollTo(video,true);
+            else video.scrollIntoView({block:'center',behavior:'instant'});
+            window.ScrollTrigger?.update?.();
+            if(video.muted&&video.paused){
+              try{await Promise.race([video.play(),new Promise(r=>setTimeout(r,350))]);}catch{}
+            }
+            await new Promise(r=>setTimeout(r,450));
+            const rect=video.getBoundingClientRect();
+            if(rect.width<2||rect.height<2)return null;
+            if(video.readyState>=2&&video.videoWidth>1){
+              try{
+                const ratio=Math.min(2,devicePixelRatio||1);
+                const scale=Math.min(1,ratio*rect.width/video.videoWidth,ratio*rect.height/video.videoHeight);
+                const canvas=document.createElement('canvas');
+                canvas.width=Math.max(1,Math.round(video.videoWidth*scale));
+                canvas.height=Math.max(1,Math.round(video.videoHeight*scale));
+                canvas.getContext('2d').drawImage(video,0,0,canvas.width,canvas.height);
+                return {src:canvas.toDataURL('image/jpeg',.85)};
+              }catch{}
+            }
+            return {rect:{x:rect.x,y:rect.y,width:rect.width,height:rect.height},viewport:{width:innerWidth,height:innerHeight}};
+          }
+        });
+        const pixels=result?.[0]?.result;
+        if(pixels?.src?.startsWith('data:image/'))src=pixels.src;
+        else if(pixels?.rect&&pixels?.viewport){
+          const r=pixels.rect,v=pixels.viewport;
+          const left=Math.max(0,r.x),top=Math.max(0,r.y);
+          const right=Math.min(v.width,r.x+r.width),bottom=Math.min(v.height,r.y+r.height);
+          if(right-left>10&&bottom-top>10){
+            const shot=await chrome.tabs.captureVisibleTab(tab.windowId,{format:'jpeg',quality:86});
+            const bitmap=await createImageBitmap(await (await fetch(shot)).blob());
+            const sx=bitmap.width/v.width,sy=bitmap.height/v.height;
+            const canvas=document.createElement('canvas');
+            canvas.width=Math.max(1,Math.floor((right-left)*sx));
+            canvas.height=Math.max(1,Math.floor((bottom-top)*sy));
+            canvas.getContext('2d').drawImage(bitmap,left*sx,top*sy,canvas.width,canvas.height,0,0,canvas.width,canvas.height);
+            bitmap.close();
+            src=canvas.toDataURL('image/jpeg',.85);
+          }
+        }
+      }catch{}
+      if(src)recovered++;else failures++;
+      data.html=data.html.replace('src="'+item.id+'"','src="'+(src||transparent)+'"');
+    }
+    for(const item of (data.blankVideos||[]).slice(12)){
+      failures++;
+      data.html=data.html.replace('src="'+item.id+'"','src="'+transparent+'"');
+    }
+  }finally{
+    if(begin)await chrome.scripting.executeScript({
+      target:{tabId:tab.id},world:'MAIN',args:[begin.x,begin.y],
+      func:(x,y)=>{
+        try{
+          const smoother=window.ScrollSmoother?.get?.();
+          if(smoother)smoother.scrollTop(y,false);
+          else if(window.lenis?.scrollTo)window.lenis.scrollTo(y,{immediate:true,force:true});
+          window.scrollTo(x,y);
+          window.ScrollTrigger?.update?.();
+        }catch{}
+      }
+    }).catch(()=>{});
+  }
+  data.unresolvedVideos=failures;
+  data.recoveredVideos=recovered;
+  return failures;
+}
+
 captureRenderedButton?.addEventListener('click',async()=>{
   if(running)return;
   running=true;captureRenderedButton.disabled=true;
@@ -822,6 +957,10 @@ captureRenderedButton?.addEventListener('click',async()=>{
       setStatus('Capturing WebGL/protected canvas pixels…');
       data.unsupportedCanvases+=await fillBlankCanvases(tab,data);
     }
+    if(data.blankVideos?.length){
+      setStatus('Recovering '+data.blankVideos.length+' video(s) as still images…');
+      await fillMissingVideos(tab,data);
+    }
     const blob=new Blob([data.html],{type:'text/html;charset=utf-8'});
     blobUrl=URL.createObjectURL(blob);
     const host=new URL(data.source).hostname.replace(/[^a-z0-9.-]/gi,'-');
@@ -830,6 +969,8 @@ captureRenderedButton?.addEventListener('click',async()=>{
     });
     if(typeof id!=='number')throw Error('Chrome did not start the HTML download.');
     const warning=(data.unsupportedCanvases?' '+data.unsupportedCanvases+' protected canvas(es) need PNG fallback.':'')
+      +(data.recoveredVideos?' Recovered '+data.recoveredVideos+' missing video frame(s) from the live tab.':'')
+      +(data.unresolvedVideos?' '+data.unresolvedVideos+' video image(s) could not be captured. Use Images capture for those sections.':'')
       +(data.unsettled?' '+data.unsettled+' loading placeholder(s) remained; inspect the source page or capture screenshots as a fallback.':'')
       +(data.repairedSections?' Restored '+data.repairedSections+' observed expanded section(s).':'')
       +(data.collapsedSections?' '+data.collapsedSections+' section(s) remained collapsed and need scene/image capture.':'')
